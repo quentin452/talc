@@ -3,18 +3,18 @@ use bracket_noise::prelude::*;
 
 use crate::{
     utils::index_to_ivec3,
-    voxel::{BlockData, BlockType},
+    voxel::BlockType,
 };
 
 #[derive(Clone)]
 pub struct ChunkData {
-    pub voxels: Vec<BlockData>,
+    pub voxels: Vec<BlockType>,
 }
 
 impl ChunkData {
     #[inline]
     #[must_use]
-    pub fn get_block(&self, index: usize) -> BlockData {
+    pub fn get_block(&self, index: usize) -> BlockType {
         if self.voxels.len() == 1 {
             self.voxels[0]
         } else {
@@ -25,7 +25,7 @@ impl ChunkData {
     // returns the block type if all voxels are the same
     #[inline]
     #[must_use]
-    pub fn get_block_if_filled(&self) -> Option<&BlockData> {
+    pub fn get_block_if_filled(&self) -> Option<&BlockType> {
         if self.voxels.len() == 1 {
             Some(&self.voxels[0])
         } else {
@@ -39,17 +39,13 @@ impl ChunkData {
         // hardcoded extremity check
         if chunk_pos.y * 32 + 32 > 21 + 32 {
             return Self {
-                voxels: vec![BlockData {
-                    block_type: BlockType::Air,
-                }],
+                voxels: vec![BlockType::Air],
             };
         }
         // hardcoded extremity check
         if chunk_pos.y * 32 < -21 - 32 {
             return Self {
-                voxels: vec![BlockData {
-                    block_type: BlockType::Grass,
-                }],
+                voxels: vec![BlockType::Grass],
             };
         }
         let mut voxels = vec![];
@@ -77,7 +73,7 @@ impl ChunkData {
             } else {
                 BlockType::Grass
             };
-            voxels.push(BlockData { block_type });
+            voxels.push(block_type);
         }
 
         Self { voxels }

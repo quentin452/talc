@@ -1,4 +1,4 @@
-#[repr(u32)]
+#[repr(u16)]
 #[derive(Eq, PartialEq, Default, Copy, Clone, Debug)]
 pub enum BlockType {
     #[default]
@@ -11,18 +11,13 @@ pub const MESHABLE_BLOCK_TYPES: &[BlockType] = &[BlockType::Grass, BlockType::Di
 
 impl BlockType {
     #[must_use] pub const fn is_solid(&self) -> bool {
+        !self.is_transparent()
+    }
+    #[must_use] pub const fn is_transparent(&self) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
         match self {
-            Self::Air => false,
-            Self::Grass => true,
-            Self::Dirt => true,
+            Self::Air => true,
+            _ => false,
         }
     }
-    #[must_use] pub const fn is_air(&self) -> bool {
-        !self.is_solid()
-    }
-}
-
-#[derive(Default, Copy, Clone, Debug)]
-pub struct BlockData {
-    pub block_type: BlockType,
 }

@@ -19,7 +19,7 @@ use talc::{
     rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
         RenderingPlugin,
-    }, scanner::{Scanner, ScannerPlugin}, sun::{Sun, SunPlugin}, utils::world_to_chunk, voxel::BlockType, voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin}
+    }, scanner::{Scanner, ScannerPlugin}, sun::SunPlugin, utils::world_to_chunk, voxel::BlockType, voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin}
 };
 
 use bevy_flycam::prelude::*;
@@ -104,8 +104,8 @@ pub fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     commands.spawn((
-        Name::new("directional light light"),
-        Sun,
+        Name::new("Sun"),
+        talc::sun::Sun,
         DirectionalLightBundle {
             directional_light: DirectionalLight {
                 illuminance: 10000.0,

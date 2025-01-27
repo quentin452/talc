@@ -22,7 +22,7 @@ use crate::{
     rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial},
     scanner::Scanner,
     utils::{get_edging_chunk, vec3_to_index},
-    voxel::{BlockData, BlockType},
+    voxel::BlockType,
 };
 use futures_lite::future;
 
@@ -299,13 +299,11 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
             if new_chunk_data.voxels.len() == 1 {
                 let mut voxels = vec![];
                 for _ in 0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32 {
-                    voxels.push(BlockData {
-                        block_type: new_chunk_data.voxels[0].block_type,
-                    });
+                    voxels.push(new_chunk_data.voxels[0]);
                 }
                 new_chunk_data.voxels = voxels;
             }
-            new_chunk_data.voxels[i].block_type = block_type;
+            new_chunk_data.voxels[i] = block_type;
             if let Some(edge_chunk) = get_edging_chunk(local_pos) {
                 adj_chunk_set.insert(edge_chunk);
             }

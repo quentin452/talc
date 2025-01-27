@@ -4,7 +4,7 @@ use talc::{
     chunks_refs::ChunksRefs,
     constants::{CHUNK_SIZE, CHUNK_SIZE_I32, CHUNK_SIZE_P},
     utils::vec3_to_index,
-    voxel::{BlockData, BlockType},
+    voxel::BlockType,
 };
 
 fn iter_chunkrefs_padding(chunks_refs: &ChunksRefs) {
@@ -29,7 +29,7 @@ fn iter_chunkrefs(chunks_refs: &ChunksRefs) {
     }
 }
 
-fn iter_vec(data: &[BlockData]) {
+fn iter_vec(data: &[BlockType]) {
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
@@ -59,9 +59,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             || {
                 let mut d = vec![];
                 for _ in 0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32 {
-                    d.push(BlockData {
-                        block_type: BlockType::Air,
-                    });
+                    d.push(BlockType::Air);
                 }
                 d
             },

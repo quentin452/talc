@@ -14,13 +14,13 @@ use crate::{
 #[must_use] pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
     #[inline]
     fn add_voxel_to_axis_cols(
-        b: crate::voxel::BlockData,
+        block: crate::voxel::BlockType,
         x: usize,
         y: usize,
         z: usize,
         axis_cols: &mut [[[u64; 34]; 34]; 3],
     ) {
-        if b.block_type.is_solid() {
+        if block.is_solid() {
             // x,z - y axis
             axis_cols[0][z][x] |= 1u64 << y as u64;
             // z,y - x axis
@@ -156,7 +156,7 @@ use crate::{
                         };
                         let ao_voxel_pos = voxel_pos + ao_sample_offset;
                         let ao_block = chunks_refs.get_block(ao_voxel_pos);
-                        if ao_block.block_type.is_solid() {
+                        if ao_block.is_solid() {
                             ao_index |= 1u32 << ao_i;
                         }
                     }
@@ -164,7 +164,7 @@ use crate::{
                     let current_voxel = chunks_refs.get_block_no_neighbour(voxel_pos);
                     // let current_voxel = chunks_refs.get_block(voxel_pos);
                     // we can only greedy mesh same block types + same ambient occlusion
-                    let block_hash = ao_index | ((current_voxel.block_type as u32) << 9);
+                    let block_hash = ao_index | ((current_voxel as u32) << 9);
                     let data = data[axis]
                         .entry(block_hash)
                         .or_default()

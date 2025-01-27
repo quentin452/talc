@@ -11,7 +11,7 @@ use crate::{
     chunk::ChunkData,
     quad::Direction,
     utils::{index_to_ivec3_bounds, vec3_to_index},
-    voxel::BlockData,
+    voxel::BlockType,
 };
 
 // pointers to chunk data, a middle one with all their neighbours
@@ -50,7 +50,7 @@ impl ChunksRefs {
         for chunk in &self.chunks[1..] {
             let option = chunk.get_block_if_filled();
             if let Some(v) = option {
-                if block.block_type != v.block_type {
+                if block != v {
                     return false;
                 }
             } else {
@@ -80,7 +80,7 @@ impl ChunksRefs {
     /// helper function to get block data that may exceed the bounds of the middle chunk
     /// input position is local pos to middle chunk
     #[must_use]
-    pub fn get_block(&self, pos: IVec3) -> BlockData {
+    pub fn get_block(&self, pos: IVec3) -> BlockType {
         let x = (pos.x + 32) as u32;
         let y = (pos.y + 32) as u32;
         let z = (pos.z + 32) as u32;
@@ -97,7 +97,7 @@ impl ChunksRefs {
     /// helper function to get voxels
     /// panics if the local pos is outside the middle chunk
     #[must_use]
-    pub fn get_block_no_neighbour(&self, pos: IVec3) -> BlockData {
+    pub fn get_block_no_neighbour(&self, pos: IVec3) -> BlockType {
         let chunk_data = &self.chunks[13];
         let i = vec3_to_index(pos, 32);
         chunk_data.get_block(i)
@@ -109,7 +109,7 @@ impl ChunksRefs {
         &self,
         pos: IVec3,
         // current back, left, down
-    ) -> (BlockData, BlockData, BlockData, BlockData) {
+    ) -> (BlockType, BlockType, BlockType, BlockType) {
         let current = self.get_block(pos);
         let back = self.get_block(pos + ivec3(0, 0, -1));
         let left = self.get_block(pos + ivec3(-1, 0, 0));
@@ -119,7 +119,7 @@ impl ChunksRefs {
 
     /// helper function to sample adjacent voxels, von neuman include all facing planes
     #[must_use]
-    pub fn get_von_neumann(&self, pos: IVec3) -> Option<Vec<(Direction, BlockData)>> {
+    pub fn get_von_neumann(&self, pos: IVec3) -> Option<Vec<(Direction, BlockType)>> {
         Some(vec![
             (Direction::Back, self.get_block(pos + ivec3(0, 0, -1))),
             (Direction::Forward, self.get_block(pos + ivec3(0, 0, 1))),
@@ -131,7 +131,7 @@ impl ChunksRefs {
     }
 
     #[must_use]
-    pub fn get_2(&self, pos: IVec3, offset: IVec3) -> (BlockData, BlockData) {
+    pub fn get_2(&self, pos: IVec3, offset: IVec3) -> (BlockType, BlockType) {
         let first = self.get_block(pos);
         let second = self.get_block(pos + offset);
         (first, second)

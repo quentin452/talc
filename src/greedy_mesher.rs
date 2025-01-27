@@ -65,7 +65,6 @@ use crate::{
                 let pos = pos * lod.jump_index();
                 let is_solid = chunks_refs
                     .get_block(pos + face_dir.air_sample_dir() * lod.jump_index())
-                    .block_type
                     .is_solid();
                 ao_data[(x + 1) as usize][(y + 1) as usize] = u32::from(is_solid);
             }
@@ -91,9 +90,9 @@ use crate::{
                 | (ao_data[x + 2][y] << 6)
                 | (ao_data[x + 2][y + 1] << 7)
                 | (ao_data[x + 2][y + 2] << 8);
-            let is_solid = current.block_type.is_solid() && !neg_z_block.block_type.is_solid();
+            let is_solid = current.is_solid() && !neg_z_block.is_solid();
             // can merge with ao?
-            let p_index = ao_index | ((current.block_type as u32) << 9);
+            let p_index = ao_index | ((current as u32) << 9);
             
             #[allow(clippy::option_if_let_else)]
             let data = if let Some(d) = x_data.get_mut(&p_index) { d } else {
@@ -136,10 +135,10 @@ use crate::{
                 let (current, neg_z_block) =
                     chunks_refs.get_2(pos, face_dir.air_sample_dir() * lod.jump_index());
                 // don't merge different block types
-                if &current.block_type != block_type {
+                if &current != block_type {
                     continue;
                 }
-                let is_solid = current.block_type.is_solid() && !neg_z_block.block_type.is_solid();
+                let is_solid = current.is_solid() && !neg_z_block.is_solid();
                 // set bit to 1 or 0 depending if solid
                 x_data[row as usize] |= (1 << column) * u32::from(is_solid);
             }

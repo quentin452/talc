@@ -28,18 +28,20 @@ impl Plugin for ScannerPlugin {
     }
 }
 
-///! scanner is responsible for identifying what chunks needs to be loaded (mesh/data)
-///! the current implementation is exellent for low render distances, 1-15
-///! but anything above that might induce some frame lag, due to how the load/unload data is calculated.  
-///! scanner::new() can also be very slow on high render distances, giving an initial slow execution time.
+/**
+scanner is responsible for identifying what chunks needs to be loaded (mesh/data)
+the current implementation is exellent for low render distances, 1-15
+but anything above that might induce some frame lag, due to how the load/unload data is calculated.  
+`scanner::new()` can also be very slow on high render distances, giving an initial slow execution time.
+*/
 #[derive(Component)]
 pub struct Scanner {
     pub prev_chunk_pos: IVec3,
-    ///! how many chunks we visit
+    /// how many chunks we visit
     pub checks_per_frame: usize,
-    ///! offset grid sampling over frames
+    /// offset grid sampling over frames
     pub data_offset: usize,
-    ///! offset grid sampling over frames
+    /// offset grid sampling over frames
     pub mesh_offset: usize,
 
     // chunk positions we are yet to check we need need to load
@@ -57,9 +59,9 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    ///! construct scanner, chunk offsets are based on distance
-    ///! warning: slow execution time on distances above 15-20,
-    pub fn new(distance: i32) -> Self {
+    /// construct scanner, chunk offsets are based on distance
+    /// warning: slow execution time on distances above 15-20,
+    #[must_use] pub fn new(distance: i32) -> Self {
         let data_distance = distance + 1;
         let mesh_distance = distance;
         let data_sampling_offsets = make_offset_vec(data_distance);
@@ -79,12 +81,12 @@ impl Scanner {
     }
 }
 
-///! on scanner chunk change, enqueue chunks to load/unload
+/// on scanner chunk change, enqueue chunks to load/unload
 fn detect_move(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut voxel_engine: ResMut<VoxelEngine>,
 ) {
-    for (mut scanner, g_transform) in scanners.iter_mut() {
+    for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = ((g_transform.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
         let previous_chunk_pos = scanner.prev_chunk_pos;
         let chunk_pos_changed = chunk_pos != scanner.prev_chunk_pos;
@@ -178,7 +180,7 @@ fn detect_move(
     }
 }
 
-///! constructs spherical positions with the provided chunk radius
+/// constructs spherical positions with the provided chunk radius
 fn make_offset_vec(half: i32) -> Vec<IVec3> {
     let k = (half * 2) + 1;
     let mut sampling_offsets = vec![];
@@ -199,7 +201,7 @@ pub fn scan_data(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut voxel_engine: ResMut<VoxelEngine>,
 ) {
-    for (mut scanner, _g_transform) in scanners.iter_mut() {
+    for (mut scanner, _g_transform) in &mut scanners {
         if voxel_engine.data_tasks.len() >= MAX_DATA_TASKS {
             return;
         }
@@ -215,9 +217,10 @@ pub fn scan_data(
                 // abort unload
                 let index_of_unloading =
                     voxel_engine.unload_data_queue.iter().enumerate().find_map(
-                        |(i, pos)| match pos == &chunk_pos {
-                            true => Some(i),
-                            false => None,
+                        |(i, pos)| if pos == &chunk_pos {
+                            Some(i)
+                        } else {
+                            None
                         },
                     );
                 if let Some(i) = index_of_unloading {
@@ -233,7 +236,7 @@ pub fn scan_data_unload(
     mut voxel_engine: ResMut<VoxelEngine>,
 ) {
     // find all loaded and check if in range
-    for (mut scanner, _g_transform) in scanners.iter_mut() {
+    for (mut scanner, _g_transform) in &mut scanners {
         for chunk_pos in scanner.unresolved_data_unload.drain(..) {
             // want to load chunk
             let is_busy = !voxel_engine.world_data.contains_key(&chunk_pos);
@@ -246,7 +249,7 @@ pub fn scan_data_unload(
 
 pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<VoxelEngine>) {
     // find all loaded and check if in range
-    for mut scanner in scanners.iter_mut() {
+    for mut scanner in &mut scanners {
         for chunk_pos in scanner.unresolved_mesh_unload.drain(..) {
             voxel_engine.unload_mesh_queue.push(chunk_pos);
         }
@@ -254,7 +257,7 @@ pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: Res
 }
 
 pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<VoxelEngine>) {
-    for mut scanner in scanners.iter_mut() {
+    for mut scanner in &mut scanners {
         // if voxel_engine.data_tasks.len() >= MAX_MESH_TASKS {
         //     return;
         // }
@@ -268,21 +271,22 @@ pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<Vox
                 .map(|of| chunk_pos + *of)
                 .all(|p| voxel_engine.world_data.contains_key(&p));
 
-            if !busy {
+            if busy {
+                retries.push(chunk_pos);
+            } else {
                 voxel_engine.load_mesh_queue.push(chunk_pos);
                 // abort unload
                 let index_of_unloading =
                     voxel_engine.unload_mesh_queue.iter().enumerate().find_map(
-                        |(i, pos)| match pos == &chunk_pos {
-                            true => Some(i),
-                            false => None,
+                        |(i, pos)| if pos == &chunk_pos {
+                            Some(i)
+                        } else {
+                            None
                         },
                     );
                 if let Some(i) = index_of_unloading {
                     voxel_engine.unload_mesh_queue.remove(i);
                 }
-            } else {
-                retries.push(chunk_pos);
             }
         }
         scanner.unresolved_mesh_load.append(&mut retries);

@@ -1,35 +1,20 @@
-use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
-};
+use std::collections::VecDeque;
 
 use bevy::{math::ivec3, prelude::*, utils::HashMap};
 
 use crate::{
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
-    constants::{ADJACENT_AO_DIRS, CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE_P2, CHUNK_SIZE_P3},
+    constants::{ADJACENT_AO_DIRS, CHUNK_SIZE, CHUNK_SIZE_P},
     face_direction::FaceDir,
     lod::Lod,
     utils::{generate_indices, make_vertex_u32, vec3_to_index},
 };
 
-pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
-    // early exit, if all faces are culled
-    if chunks_refs.is_all_voxels_same() {
-        return None;
-    }
-    let mut mesh = ChunkMesh::default();
-
-    // solid binary for each x,y,z axis (3)
-    let mut axis_cols = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 3];
-
-    // the cull mask to perform greedy slicing, based on solids on previous axis_cols
-    let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
-
+#[must_use] pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
     #[inline]
     fn add_voxel_to_axis_cols(
-        b: &crate::voxel::BlockData,
+        b: crate::voxel::BlockData,
         x: usize,
         y: usize,
         z: usize,
@@ -45,6 +30,20 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
         }
     }
 
+    // early exit, if all faces are culled
+    if chunks_refs.is_all_voxels_same() {
+        return None;
+    }
+    let mut mesh = ChunkMesh::default();
+
+    // solid binary for each x,y,z axis (3)
+    #[allow(clippy::large_stack_arrays)]
+    let mut axis_cols = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 3];
+
+    // the cull mask to perform greedy slicing, based on solids on previous axis_cols
+    #[allow(clippy::large_stack_arrays)]
+    let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
+
     // inner chunk voxels.
     let chunk = &*chunks_refs.chunks[vec3_to_index(IVec3::new(1, 1, 1), 3)];
     assert!(chunk.voxels.len() == CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE || chunk.voxels.len() == 1);
@@ -55,7 +54,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
                     1 => 0,
                     _ => (z * CHUNK_SIZE + y) * CHUNK_SIZE + x,
                 };
-                add_voxel_to_axis_cols(&chunk.voxels[i], x + 1, y + 1, z + 1, &mut axis_cols)
+                add_voxel_to_axis_cols(chunk.voxels[i], x + 1, y + 1, z + 1, &mut axis_cols);
             }
         }
     }
@@ -97,7 +96,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
                 let col = axis_cols[axis][z][x];
 
                 // sample descending axis, and set true when air meets solid
-                col_face_masks[2 * axis + 0][z][x] = col & !(col << 1);
+                col_face_masks[2 * axis][z][x] = col & !(col << 1);
                 // sample ascending axis, and set true when air meets solid
                 col_face_masks[2 * axis + 1][z][x] = col & !(col >> 1);
             }
@@ -171,7 +170,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
                         .or_default()
                         .entry(y)
                         .or_default();
-                    data[x as usize] |= 1u32 << z as u32;
+                    data[x] |= 1u32 << z as u32;
                 }
             }
         }
@@ -187,15 +186,15 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
             4 => FaceDir::Forward,
             _ => FaceDir::Back,
         };
-        for (block_ao, axis_plane) in block_ao_data.into_iter() {
+        for (block_ao, axis_plane) in block_ao_data {
             let ao = block_ao & 0b111111111;
             let block_type = block_ao >> 9;
-            for (axis_pos, plane) in axis_plane.into_iter() {
+            for (axis_pos, plane) in axis_plane {
                 let quads_from_axis = greedy_mesh_binary_plane(plane, lod.size() as u32);
 
-                quads_from_axis.into_iter().for_each(|q| {
-                    q.append_vertices(&mut vertices, facedir, axis_pos, &Lod::L32, ao, block_type)
-                });
+                for q in quads_from_axis {
+                    q.append_vertices(&mut vertices, facedir, axis_pos, &Lod::L32, ao, block_type);
+                }
             }
         }
     }
@@ -219,7 +218,7 @@ pub struct GreedyQuad {
 }
 
 impl GreedyQuad {
-    ///! compress this quad data into the input vertices vec
+    /// compress this quad data into the input vertices vec
     pub fn append_vertices(
         &self,
         vertices: &mut Vec<u32>,
@@ -235,23 +234,23 @@ impl GreedyQuad {
         let jump = lod.jump_index();
 
         // pack ambient occlusion strength into vertex
-        let v1ao = ((ao >> 0) & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
+        let v1ao = (ao & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
         let v2ao = ((ao >> 3) & 1) + ((ao >> 6) & 1) + ((ao >> 7) & 1);
         let v3ao = ((ao >> 5) & 1) + ((ao >> 8) & 1) + ((ao >> 7) & 1);
         let v4ao = ((ao >> 1) & 1) + ((ao >> 2) & 1) + ((ao >> 5) & 1);
 
         let v1 = make_vertex_u32(
-            face_dir.world_to_sample(axis as i32, self.x as i32, self.y as i32, &lod) * jump,
+            face_dir.world_to_sample(axis, self.x as i32, self.y as i32, lod) * jump,
             v1ao,
             face_dir.normal_index(),
             block_type,
         );
         let v2 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32 + self.w as i32,
                 self.y as i32,
-                &lod,
+                lod,
             ) * jump,
             v2ao,
             face_dir.normal_index(),
@@ -259,10 +258,10 @@ impl GreedyQuad {
         );
         let v3 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32 + self.w as i32,
                 self.y as i32 + self.h as i32,
-                &lod,
+                lod,
             ) * jump,
             v3ao,
             face_dir.normal_index(),
@@ -270,10 +269,10 @@ impl GreedyQuad {
         );
         let v4 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32,
                 self.y as i32 + self.h as i32,
-                &lod,
+                lod,
             ) * jump,
             v4ao,
             face_dir.normal_index(),
@@ -302,9 +301,9 @@ impl GreedyQuad {
     }
 }
 
-///! generate quads of a binary slice
-///! lod not implemented atm
-pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<GreedyQuad> {
+/// generate quads of a binary slice
+/// lod not implemented atm
+#[must_use] pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<GreedyQuad> {
     let mut greedy_quads = vec![];
     for row in 0..data.len() {
         let mut y = 0;
@@ -330,7 +329,7 @@ pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<Greed
                 }
 
                 // nuke the bits we expanded into
-                data[row + w] = data[row + w] & !mask;
+                data[row + w] &= !mask;
 
                 w += 1;
             }

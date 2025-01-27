@@ -12,31 +12,31 @@ pub enum Direction {
 }
 
 impl Direction {
-    ///! normal data is packed in the shader
-    pub fn get_normal(&self) -> i32 {
+    /// normal data is packed in the shader
+    #[must_use] pub const fn get_normal(&self) -> i32 {
         match self {
-            Direction::Left => 0i32,
-            Direction::Right => 1i32,
-            Direction::Down => 2i32,
-            Direction::Up => 3i32,
-            Direction::Back => 4i32,
-            Direction::Forward => 5i32,
+            Self::Left => 0i32,
+            Self::Right => 1i32,
+            Self::Down => 2i32,
+            Self::Up => 3i32,
+            Self::Back => 4i32,
+            Self::Forward => 5i32,
         }
     }
 
-    pub fn get_opposite(self) -> Self {
+    #[must_use] pub const fn get_opposite(self) -> Self {
         match self {
-            Direction::Left => Direction::Right,
-            Direction::Right => Direction::Left,
-            Direction::Down => Direction::Up,
-            Direction::Up => Direction::Down,
-            Direction::Back => Direction::Forward,
-            Direction::Forward => Direction::Back,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Down => Self::Up,
+            Self::Up => Self::Down,
+            Self::Back => Self::Forward,
+            Self::Forward => Self::Back,
         }
     }
 }
 
-///! plane data with 4 vertices
+/// plane data with 4 vertices
 pub struct Quad {
     pub color: Color,
     pub direction: Direction,
@@ -47,7 +47,7 @@ impl Quad {
     // the input position is assumed to be a voxel's (0,0,0) pos
     // therefore right / up / forward are offset by 1
     #[inline]
-    pub fn from_direction(direction: Direction, pos: IVec3, color: Color) -> Self {
+    #[must_use] pub const fn from_direction(direction: Direction, pos: IVec3, color: Color) -> Self {
         let corners = match direction {
             Direction::Left => [
                 [pos.x, pos.y, pos.z],
@@ -88,9 +88,9 @@ impl Quad {
         };
 
         Self {
-            corners,
             color,
             direction,
+            corners,
         }
     }
 }

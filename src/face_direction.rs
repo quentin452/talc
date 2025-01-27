@@ -13,64 +13,67 @@ pub enum FaceDir {
 }
 
 impl FaceDir {
-    ///! normal data is packed in the shader
-    pub fn normal_index(&self) -> u32 {
+    /// normal data is packed in the shader
+    #[must_use]
+    pub const fn normal_index(&self) -> u32 {
         match self {
-            FaceDir::Left => 0u32,
-            FaceDir::Right => 1u32,
-            FaceDir::Down => 2u32,
-            FaceDir::Up => 3u32,
-            FaceDir::Forward => 4u32,
-            FaceDir::Back => 5u32,
+            Self::Left => 0u32,
+            Self::Right => 1u32,
+            Self::Down => 2u32,
+            Self::Up => 3u32,
+            Self::Forward => 4u32,
+            Self::Back => 5u32,
         }
     }
 
-    ///! direction to sample face culling
-    pub fn air_sample_dir(&self) -> IVec3 {
+    /// direction to sample face culling
+    #[must_use]
+    pub const fn air_sample_dir(&self) -> IVec3 {
         match self {
-            FaceDir::Up => IVec3::Y,
-            FaceDir::Down => IVec3::NEG_Y,
-            FaceDir::Left => IVec3::NEG_X,
-            FaceDir::Right => IVec3::X,
-            FaceDir::Forward => IVec3::NEG_Z,
-            FaceDir::Back => IVec3::Z,
+            Self::Up => IVec3::Y,
+            Self::Down => IVec3::NEG_Y,
+            Self::Left => IVec3::NEG_X,
+            Self::Right => IVec3::X,
+            Self::Forward => IVec3::NEG_Z,
+            Self::Back => IVec3::Z,
         }
     }
 
-    ///! offset input position with this face direction
-    pub fn world_to_sample(&self, axis: i32, x: i32, y: i32, _lod: &Lod) -> IVec3 {
+    /// offset input position with this face direction
+    #[must_use] pub const fn world_to_sample(&self, axis: i32, x: i32, y: i32, _lod: &Lod) -> IVec3 {
         match self {
-            FaceDir::Up => ivec3(x, axis + 1, y),
-            FaceDir::Down => ivec3(x, axis, y),
-            FaceDir::Left => ivec3(axis, y, x),
-            FaceDir::Right => ivec3(axis + 1, y, x),
-            FaceDir::Forward => ivec3(x, y, axis),
-            FaceDir::Back => ivec3(x, y, axis + 1),
+            Self::Up => ivec3(x, axis + 1, y),
+            Self::Down => ivec3(x, axis, y),
+            Self::Left => ivec3(axis, y, x),
+            Self::Right => ivec3(axis + 1, y, x),
+            Self::Forward => ivec3(x, y, axis),
+            Self::Back => ivec3(x, y, axis + 1),
         }
     }
 
-    ///! returns true if vertices should be reverse.
-    ///! (needed because indices are always same)  
-    pub fn reverse_order(&self) -> bool {
+    /// returns true if vertices should be reverse.
+    /// (needed because indices are always same)  
+    #[must_use]
+    pub const fn reverse_order(&self) -> bool {
         match self {
-            FaceDir::Up => true,      //+1
-            FaceDir::Down => false,   //-1
-            FaceDir::Left => false,   //-1
-            FaceDir::Right => true,   //+1
-            FaceDir::Forward => true, //-1
-            FaceDir::Back => false,   //+1
+            Self::Up => true,      //+1
+            Self::Down => false,   //-1
+            Self::Left => false,   //-1
+            Self::Right => true,   //+1
+            Self::Forward => true, //-1
+            Self::Back => false,   //+1
         }
     }
 
-    ///! get delta for traversing the previous axis pos
-    pub fn negate_axis(&self) -> i32 {
+    /// get delta for traversing the previous axis pos
+    #[must_use] pub const fn negate_axis(&self) -> i32 {
         match self {
-            FaceDir::Up => -1,     //+1
-            FaceDir::Down => 0,    //-1
-            FaceDir::Left => 0,    //-1
-            FaceDir::Right => -1,  //+1
-            FaceDir::Forward => 0, //-1
-            FaceDir::Back => 1,    //+1
+            Self::Up => -1,     //+1
+            Self::Down => 0,    //-1
+            Self::Left => 0,    //-1
+            Self::Right => -1,  //+1
+            Self::Forward => 0, //-1
+            Self::Back => 1,    //+1
         }
     }
 }

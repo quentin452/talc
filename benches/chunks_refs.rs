@@ -7,7 +7,7 @@ use talc::{
     voxel::{BlockData, BlockType},
 };
 
-fn iter_chunkrefs_padding(chunks_refs: ChunksRefs) {
+fn iter_chunkrefs_padding(chunks_refs: &ChunksRefs) {
     for x in 0..CHUNK_SIZE_P {
         for z in 0..CHUNK_SIZE_P {
             for y in 0..CHUNK_SIZE_P {
@@ -18,7 +18,7 @@ fn iter_chunkrefs_padding(chunks_refs: ChunksRefs) {
     }
 }
 
-fn iter_chunkrefs(chunks_refs: ChunksRefs) {
+fn iter_chunkrefs(chunks_refs: &ChunksRefs) {
     for x in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
@@ -29,7 +29,7 @@ fn iter_chunkrefs(chunks_refs: ChunksRefs) {
     }
 }
 
-fn iter_vec(data: Vec<BlockData>) {
+fn iter_vec(data: &[BlockData]) {
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
@@ -45,14 +45,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("iter chunk_refs ", |b| {
         b.iter_with_setup(
             || ChunksRefs::make_dummy_chunk_refs(0),
-            |i| iter_chunkrefs(i),
-        )
+            |i| iter_chunkrefs(&i),
+        );
     });
     c.bench_function("iter chunk_refs padding ", |b| {
         b.iter_with_setup(
             || ChunksRefs::make_dummy_chunk_refs(0),
-            |i| iter_chunkrefs_padding(i),
-        )
+            |i| iter_chunkrefs_padding(&i),
+        );
     });
     c.bench_function("iter vec", |b| {
         b.iter_with_setup(
@@ -65,8 +65,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                 }
                 d
             },
-            |i| iter_vec(i),
-        )
+            |i| iter_vec(&i),
+        );
     });
 }
 

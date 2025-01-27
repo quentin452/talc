@@ -1,7 +1,7 @@
 [package]
 name = "talc"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,6 +29,13 @@ trivial_regex = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
 cast_precision_loss = "allow"
+match_same_arms = "allow"
+
+# todo
+cast_wrap_around = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
 
 [config.clippy]
 avoid-breaking-exported-api = false
@@ -36,10 +43,6 @@ avoid-breaking-exported-api = false
 # [[bench]]
 # name = "chunk"
 # harness = false
-
-[[bench]]
-name = "meshing"
-harness = false
 
 # [[bench]]
 # name = "chunks_refs"

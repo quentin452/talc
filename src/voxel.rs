@@ -7,17 +7,17 @@ pub enum BlockType {
     Dirt,
 }
 
-pub const MESHABLE_BLOCK_TYPES: &'static [BlockType] = &[BlockType::Grass, BlockType::Dirt];
+pub const MESHABLE_BLOCK_TYPES: &[BlockType] = &[BlockType::Grass, BlockType::Dirt];
 
 impl BlockType {
-    pub fn is_solid(&self) -> bool {
+    #[must_use] pub const fn is_solid(&self) -> bool {
         match self {
-            BlockType::Air => false,
-            BlockType::Grass => true,
-            BlockType::Dirt => true,
+            Self::Air => false,
+            Self::Grass => true,
+            Self::Dirt => true,
         }
     }
-    pub fn is_air(&self) -> bool {
+    #[must_use] pub const fn is_air(&self) -> bool {
         !self.is_solid()
     }
 }

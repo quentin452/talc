@@ -13,16 +13,18 @@ pub struct ChunkData {
 
 impl ChunkData {
     #[inline]
-    pub fn get_block(&self, index: usize) -> &BlockData {
+    #[must_use]
+    pub fn get_block(&self, index: usize) -> BlockData {
         if self.voxels.len() == 1 {
-            &self.voxels[0]
+            self.voxels[0]
         } else {
-            &self.voxels[index]
+            self.voxels[index]
         }
     }
 
     // returns the block type if all voxels are the same
     #[inline]
+    #[must_use]
     pub fn get_block_if_filled(&self) -> Option<&BlockData> {
         if self.voxels.len() == 1 {
             Some(&self.voxels[0])
@@ -31,7 +33,8 @@ impl ChunkData {
         }
     }
 
-    ///! shape our voxel data based on the chunk_pos
+    /// shape our voxel data based on the `chunk_pos`
+    #[must_use]
     pub fn generate(chunk_pos: IVec3) -> Self {
         // hardcoded extremity check
         if chunk_pos.y * 32 + 32 > 21 + 32 {
@@ -67,12 +70,12 @@ impl ChunkData {
             let h = noise_2 * 30.0;
             let solid = h > voxel_pos.y as f32;
 
-            let block_type = match solid {
-                true => match (h - voxel_pos.y as f32) > 1.0 {
-                    true => BlockType::Dirt,
-                    false => BlockType::Grass,
-                },
-                false => BlockType::Air,
+            let block_type = if !solid {
+                BlockType::Air
+            } else if (h - voxel_pos.y as f32) > 1.0 {
+                BlockType::Dirt
+            } else {
+                BlockType::Grass
             };
             voxels.push(BlockData { block_type });
         }

@@ -1,10 +1,8 @@
-use std::{collections::VecDeque, sync::Arc, time::Instant};
+use std::collections::VecDeque;
 
-use bevy::{prelude::*, utils::HashMap};
-use rand::Rng;
+use bevy::utils::HashMap;
 
 use crate::{
-    chunk::ChunkData,
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     face_direction::FaceDir,
@@ -13,14 +11,14 @@ use crate::{
     voxel::MESHABLE_BLOCK_TYPES,
 };
 
-pub fn build_chunk_mesh(chunks_refs: ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
+#[must_use] pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
     let mut mesh = ChunkMesh::default();
     let mut quads = vec![];
-    quads.extend(vertices_from_face(FaceDir::Up, &chunks_refs, &lod));
-    quads.extend(vertices_from_face(FaceDir::Left, &chunks_refs, &lod));
+    quads.extend(vertices_from_face(FaceDir::Up, chunks_refs, &lod));
+    quads.extend(vertices_from_face(FaceDir::Left, chunks_refs, &lod));
     // quads.extend(vertices_from_face(FaceDir::Right, &chunks_refs, &lod));
     // quads.extend(vertices_from_face(FaceDir::Down, &chunks_refs, &lod));
-    quads.extend(vertices_from_face(FaceDir::Forward, &chunks_refs, &lod));
+    quads.extend(vertices_from_face(FaceDir::Forward, chunks_refs, &lod));
     // quads.extend(vertices_from_face(FaceDir::Back, &chunks_refs, &lod));
     mesh.vertices.extend(quads);
     if mesh.vertices.is_empty() {
@@ -31,19 +29,19 @@ pub fn build_chunk_mesh(chunks_refs: ChunksRefs, lod: Lod) -> Option<ChunkMesh> 
     }
 }
 
-pub fn build_chunk_mesh_no_ao(chunks_refs: ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
+#[must_use] pub fn build_chunk_mesh_no_ao(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
     let mut mesh = ChunkMesh::default();
     let mut quads = vec![];
-    quads.extend(vertices_from_face_no_ao(FaceDir::Up, &chunks_refs, &lod));
-    quads.extend(vertices_from_face_no_ao(FaceDir::Left, &chunks_refs, &lod));
-    quads.extend(vertices_from_face_no_ao(FaceDir::Right, &chunks_refs, &lod));
-    quads.extend(vertices_from_face_no_ao(FaceDir::Down, &chunks_refs, &lod));
+    quads.extend(vertices_from_face_no_ao(FaceDir::Up, chunks_refs, &lod));
+    quads.extend(vertices_from_face_no_ao(FaceDir::Left, chunks_refs, &lod));
+    quads.extend(vertices_from_face_no_ao(FaceDir::Right, chunks_refs, &lod));
+    quads.extend(vertices_from_face_no_ao(FaceDir::Down, chunks_refs, &lod));
     quads.extend(vertices_from_face_no_ao(
         FaceDir::Forward,
-        &chunks_refs,
+        chunks_refs,
         &lod,
     ));
-    quads.extend(vertices_from_face_no_ao(FaceDir::Back, &chunks_refs, &lod));
+    quads.extend(vertices_from_face_no_ao(FaceDir::Back, chunks_refs, &lod));
     mesh.vertices.extend(quads);
     if mesh.vertices.is_empty() {
         None
@@ -53,8 +51,8 @@ pub fn build_chunk_mesh_no_ao(chunks_refs: ChunksRefs, lod: Lod) -> Option<Chunk
     }
 }
 
-///! generate vertices for the facing direction, all planes of a chunk
-pub fn vertices_from_face(face_dir: FaceDir, chunks_refs: &ChunksRefs, lod: &Lod) -> Vec<u32> {
+/// generate vertices for the facing direction, all planes of a chunk
+#[must_use] pub fn vertices_from_face(face_dir: FaceDir, chunks_refs: &ChunksRefs, lod: &Lod) -> Vec<u32> {
     // generate -x plane
     let mut vertices = vec![];
     let size = lod.size();
@@ -69,7 +67,7 @@ pub fn vertices_from_face(face_dir: FaceDir, chunks_refs: &ChunksRefs, lod: &Lod
                     .get_block(pos + face_dir.air_sample_dir() * lod.jump_index())
                     .block_type
                     .is_solid();
-                ao_data[(x + 1) as usize][(y + 1) as usize] = is_solid as u32;
+                ao_data[(x + 1) as usize][(y + 1) as usize] = u32::from(is_solid);
             }
         }
 
@@ -77,50 +75,49 @@ pub fn vertices_from_face(face_dir: FaceDir, chunks_refs: &ChunksRefs, lod: &Lod
         let mut x_data = HashMap::<u32, [u32; 32]>::new();
         for i in 0..size * size {
             let x = i % size;
-            let y = (i / size) as i32;
+            let y = i / size;
             let pos = face_dir.world_to_sample(axis, x, y, lod);
             let pos = pos * lod.jump_index();
             let (current, neg_z_block) =
                 chunks_refs.get_2(pos, face_dir.air_sample_dir() * lod.jump_index());
             let x = x as usize;
             let y = y as usize;
-            let ao_index = ao_data[x + 0][y + 0]
-                | (ao_data[x + 0][y + 1] << 1)
-                | (ao_data[x + 0][y + 2] << 2)
-                | (ao_data[x + 1][y + 0] << 3)
+            let ao_index = ao_data[x][y]
+                | (ao_data[x][y + 1] << 1)
+                | (ao_data[x][y + 2] << 2)
+                | (ao_data[x + 1][y] << 3)
                 | (ao_data[x + 1][y + 1] << 4)
                 | (ao_data[x + 1][y + 2] << 5)
-                | (ao_data[x + 2][y + 0] << 6)
+                | (ao_data[x + 2][y] << 6)
                 | (ao_data[x + 2][y + 1] << 7)
                 | (ao_data[x + 2][y + 2] << 8);
             let is_solid = current.block_type.is_solid() && !neg_z_block.block_type.is_solid();
             // can merge with ao?
             let p_index = ao_index | ((current.block_type as u32) << 9);
-            let data = match x_data.get_mut(&p_index) {
-                Some(d) => d,
-                None => {
-                    x_data.insert(p_index, [0u32; 32]);
-                    x_data.get_mut(&p_index).unwrap()
-                }
+            
+            #[allow(clippy::option_if_let_else)]
+            let data = if let Some(d) = x_data.get_mut(&p_index) { d } else {
+                x_data.insert(p_index, [0u32; 32]);
+                x_data.get_mut(&p_index).unwrap()
             };
 
             // set bit to 1 or 0 depending if solid
-            data[x as usize] |= (1 << y) * is_solid as u32;
+            data[x] |= (1 << y) * u32::from(is_solid);
         } // axis type loop
-        for (p_index, data) in x_data.into_iter() {
+        for (p_index, data) in x_data {
             let quads_from_axis = greedy_mesh_binary_plane(data, lod.size() as u32);
             let ao = p_index & 0b111111111;
             let block_type = p_index >> 9;
 
-            quads_from_axis.into_iter().for_each(|q| {
-                q.append_vertices(&mut vertices, face_dir, axis as u32, lod, ao, block_type)
-            });
+            for q in quads_from_axis {
+                q.append_vertices(&mut vertices, face_dir, axis as u32, lod, ao, block_type);
+            }
         }
     }
     vertices
 }
 
-pub fn vertices_from_face_no_ao(
+#[must_use] pub fn vertices_from_face_no_ao(
     face_dir: FaceDir,
     chunks_refs: &ChunksRefs,
     lod: &Lod,
@@ -129,11 +126,11 @@ pub fn vertices_from_face_no_ao(
     let mut vertices = vec![];
     let size = lod.size();
     for axis in 0..size {
-        for block_type in MESHABLE_BLOCK_TYPES.iter() {
+        for block_type in MESHABLE_BLOCK_TYPES {
             let mut x_data = [0u32; 32];
             for i in 0..size * size {
                 let row = i % size;
-                let column = (i / size) as i32;
+                let column = i / size;
                 let pos = face_dir.world_to_sample(axis, row, column, lod);
                 let pos = pos * lod.jump_index();
                 let (current, neg_z_block) =
@@ -144,7 +141,7 @@ pub fn vertices_from_face_no_ao(
                 }
                 let is_solid = current.block_type.is_solid() && !neg_z_block.block_type.is_solid();
                 // set bit to 1 or 0 depending if solid
-                x_data[row as usize] = ((1 << column) * is_solid as u32) | x_data[row as usize];
+                x_data[row as usize] |= (1 << column) * u32::from(is_solid);
             }
             let quads_from_axis = greedy_mesh_binary_plane(x_data, lod.size() as u32);
             quads_from_axis
@@ -155,7 +152,7 @@ pub fn vertices_from_face_no_ao(
     vertices
 }
 
-///! todo: compress further?
+/// todo: compress further?
 #[derive(Debug)]
 pub struct GreedyQuad {
     pub x: u32,
@@ -165,7 +162,7 @@ pub struct GreedyQuad {
 }
 
 impl GreedyQuad {
-    ///! compress this quad data into the input vertices vec
+    /// compress this quad data into the input vertices vec
     pub fn append_vertices(
         &self,
         vertices: &mut Vec<u32>,
@@ -180,23 +177,23 @@ impl GreedyQuad {
         let jump = lod.jump_index();
 
         // pack ambient occlusion strength into vertex
-        let v1ao = ((ao >> 0) & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
+        let v1ao = (ao & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
         let v2ao = ((ao >> 3) & 1) + ((ao >> 6) & 1) + ((ao >> 7) & 1);
         let v3ao = ((ao >> 5) & 1) + ((ao >> 8) & 1) + ((ao >> 7) & 1);
         let v4ao = ((ao >> 1) & 1) + ((ao >> 2) & 1) + ((ao >> 5) & 1);
 
         let v1 = make_vertex_u32(
-            face_dir.world_to_sample(axis as i32, self.x as i32, self.y as i32, &lod) * jump,
+            face_dir.world_to_sample(axis, self.x as i32, self.y as i32, lod) * jump,
             v1ao,
             face_dir.normal_index(),
             block_type,
         );
         let v2 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32 + self.w as i32,
                 self.y as i32,
-                &lod,
+                lod,
             ) * jump,
             v2ao,
             face_dir.normal_index(),
@@ -204,10 +201,10 @@ impl GreedyQuad {
         );
         let v3 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32 + self.w as i32,
                 self.y as i32 + self.h as i32,
-                &lod,
+                lod,
             ) * jump,
             v3ao,
             face_dir.normal_index(),
@@ -215,10 +212,10 @@ impl GreedyQuad {
         );
         let v4 = make_vertex_u32(
             face_dir.world_to_sample(
-                axis as i32,
+                axis,
                 self.x as i32,
                 self.y as i32 + self.h as i32,
-                &lod,
+                lod,
             ) * jump,
             v4ao,
             face_dir.normal_index(),
@@ -246,9 +243,9 @@ impl GreedyQuad {
     }
 }
 
-///! generate quads of a binary slice
-///! lod not implemented yet
-pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<GreedyQuad> {
+/// generate quads of a binary slice
+/// lod not implemented yet
+#[must_use] pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<GreedyQuad> {
     let mut greedy_quads = vec![];
     for row in 0..data.len() {
         let mut y = 0;
@@ -277,7 +274,7 @@ pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<Greed
                 }
 
                 // nuke the bits we expanded into
-                data[row + w] = data[row + w] & !mask;
+                data[row + w] &= !mask;
 
                 w += 1;
             }

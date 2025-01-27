@@ -27,6 +27,7 @@ impl Plugin for RenderingPlugin {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn apply_chunk_material(
     no_wireframe: Query<Entity, With<Handle<ChunkMaterial>>>,
     wireframe: Query<Entity, With<Handle<ChunkMaterialWireframe>>>,
@@ -36,10 +37,10 @@ fn apply_chunk_material(
     chunk_mat: Res<GlobalChunkMaterial>,
     chunk_mat_wireframe: Res<GlobalChunkWireframeMaterial>,
 ) {
+    use ChunkMaterialWireframeMode as F;
     if !input.just_pressed(KeyCode::KeyT) {
         return;
     }
-    use ChunkMaterialWireframeMode as F;
     *mode = match *mode {
         F::On => F::Off,
         F::Off => F::On,

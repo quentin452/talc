@@ -43,8 +43,6 @@ impl Plugin for VoxelEnginePlugin {
             Update,
             ((join_data, join_mesh), (unload_data, unload_mesh)).chain(),
         );
-        app.add_systems(Update, debug_inputs);
-
         app.add_systems(Startup, setup_diagnostics);
         app.register_diagnostic(Diagnostic::new(DIAG_LOAD_MESH_QUEUE));
         app.register_diagnostic(Diagnostic::new(DIAG_UNLOAD_MESH_QUEUE));
@@ -57,34 +55,7 @@ impl Plugin for VoxelEnginePlugin {
     }
 }
 
-pub fn debug_inputs(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut voxel_engine: ResMut<VoxelEngine>,
-    scanners: Query<(&GlobalTransform, &Scanner)>,
-) {
-    if keyboard_input.just_pressed(KeyCode::KeyR) {
-        // swap meshing algorithm
-        use MeshingMethod as MM;
-        voxel_engine.meshing_method = match voxel_engine.meshing_method {
-            MM::VertexCulled => MM::BinaryGreedyMeshing,
-            MM::BinaryGreedyMeshing => MM::VertexCulled,
-        };
-        let (scanner_transform, scanner) = scanners.single();
-        // unload all meshes
-        voxel_engine.unload_all_meshes(scanner, scanner_transform);
-    }
-    if keyboard_input.just_pressed(KeyCode::KeyT) {
-        // toggle rendering method
-    }
-}
-
-#[derive(Debug, Reflect, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum MeshingMethod {
-    VertexCulled,
-    BinaryGreedyMeshing,
-}
-
-///! holds all voxel world data
+/// holds all voxel world data
 #[derive(Resource)]
 pub struct VoxelEngine {
     pub world_data: HashMap<IVec3, Arc<ChunkData>>,
@@ -94,11 +65,9 @@ pub struct VoxelEngine {
     pub unload_data_queue: Vec<IVec3>,
     pub unload_mesh_queue: Vec<IVec3>,
     pub data_tasks: HashMap<IVec3, Option<Task<ChunkData>>>,
-    // pub mesh_tasks: HashMap<IVec3, Option<Task<Option<ChunkMesh>>>>,
     pub mesh_tasks: Vec<(IVec3, Option<Task<Option<ChunkMesh>>>)>,
     pub chunk_entities: HashMap<IVec3, Entity>,
     pub lod: Lod,
-    pub meshing_method: MeshingMethod,
     pub chunk_modifications: HashMap<IVec3, Vec<ChunkModification>>,
 }
 
@@ -143,6 +112,7 @@ fn setup_diagnostics(mut onscreen: ResMut<ScreenDiagnostics>) {
         .format(|v| format!("{v:0>2.0}"));
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn diagnostics_count(mut diagnostics: Diagnostics, voxel_engine: Res<VoxelEngine>) {
     diagnostics.add_measurement(&DIAG_LOAD_DATA_QUEUE, || {
         voxel_engine.load_data_queue.len() as f64
@@ -159,11 +129,11 @@ fn diagnostics_count(mut diagnostics: Diagnostics, voxel_engine: Res<VoxelEngine
     diagnostics.add_measurement(&DIAG_MESH_TASKS, || voxel_engine.mesh_tasks.len() as f64);
     diagnostics.add_measurement(&DIAG_DATA_TASKS, || voxel_engine.data_tasks.len() as f64);
     diagnostics.add_measurement(&DIAG_VERTEX_COUNT, || {
-        voxel_engine
+        f64::from(voxel_engine
             .vertex_diagnostic
             .iter()
             .map(|(_, v)| v)
-            .sum::<i32>() as f64
+            .sum::<i32>())
     });
 }
 
@@ -185,7 +155,7 @@ impl VoxelEngine {
 
 impl Default for VoxelEngine {
     fn default() -> Self {
-        VoxelEngine {
+        Self {
             world_data: HashMap::new(),
             load_data_queue: Vec::new(),
             load_mesh_queue: Vec::new(),
@@ -193,18 +163,16 @@ impl Default for VoxelEngine {
             unload_mesh_queue: Vec::new(),
             data_tasks: HashMap::new(),
             mesh_tasks: Vec::new(),
-            // mesh_tasks: HashMap::new(),
             chunk_entities: HashMap::new(),
             lod: Lod::L32,
-            // meshing_method: MeshingMethod::VertexCulled,
-            meshing_method: MeshingMethod::BinaryGreedyMeshing,
             vertex_diagnostic: HashMap::new(),
             chunk_modifications: HashMap::new(),
         }
     }
 }
 
-///! begin data building tasks for chunks in range
+/// begin data building tasks for chunks in range
+#[allow(clippy::needless_pass_by_value)]
 pub fn start_data_tasks(
     mut voxel_engine: ResMut<VoxelEngine>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
@@ -232,14 +200,13 @@ pub fn start_data_tasks(
         // for world_pos in load_data_queue.drain(..) {
         let k = world_pos;
         let task = task_pool.spawn(async move {
-            let cd = ChunkData::generate(k);
-            cd
+            ChunkData::generate(k)
         });
         data_tasks.insert(world_pos, Some(task));
     }
 }
 
-///! destroy enqueued, chunk data
+/// destroy enqueued, chunk data
 pub fn unload_data(mut voxel_engine: ResMut<VoxelEngine>) {
     let VoxelEngine {
         unload_data_queue,
@@ -251,7 +218,7 @@ pub fn unload_data(mut voxel_engine: ResMut<VoxelEngine>) {
     }
 }
 
-///! destroy enqueued, chunk mesh entities
+/// destroy enqueued, chunk mesh entities
 pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<VoxelEngine>) {
     let VoxelEngine {
         unload_mesh_queue,
@@ -273,7 +240,8 @@ pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<VoxelEngine>
     unload_mesh_queue.append(&mut retry);
 }
 
-///! begin mesh building tasks for chunks in range
+/// begin mesh building tasks for chunks in range
+#[allow(clippy::needless_pass_by_value)]
 pub fn start_mesh_tasks(
     mut voxel_engine: ResMut<VoxelEngine>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
@@ -285,7 +253,6 @@ pub fn start_mesh_tasks(
         mesh_tasks,
         world_data,
         lod,
-        meshing_method,
         ..
     } = voxel_engine.as_mut();
 
@@ -304,14 +271,9 @@ pub fn start_mesh_tasks(
             continue;
         };
         let llod = *lod;
-        let task = match meshing_method {
-            MeshingMethod::BinaryGreedyMeshing => task_pool.spawn(async move {
-                crate::greedy_mesher_optimized::build_chunk_mesh(&chunks_refs, llod)
-            }),
-            MeshingMethod::VertexCulled => task_pool.spawn(async move {
-                crate::culled_mesher::build_chunk_mesh_ao(&chunks_refs, llod)
-            }),
-        };
+        let task = task_pool.spawn(async move {
+            crate::greedy_mesher_optimized::build_chunk_mesh(&chunks_refs, llod)
+        });
 
         mesh_tasks.push((world_pos, Some(task)));
     }
@@ -332,7 +294,7 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
         };
         let new_chunk_data = Arc::make_mut(chunk_data);
         let mut adj_chunk_set = HashSet::new();
-        for ChunkModification(local_pos, block_type) in mods.into_iter() {
+        for ChunkModification(local_pos, block_type) in mods {
             let i = vec3_to_index(local_pos, 32);
             if new_chunk_data.voxels.len() == 1 {
                 let mut voxels = vec![];
@@ -348,14 +310,14 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
                 adj_chunk_set.insert(edge_chunk);
             }
         }
-        for adj_chunk in adj_chunk_set.into_iter() {
+        for adj_chunk in adj_chunk_set {
             load_mesh_queue.push(pos + adj_chunk);
         }
         load_mesh_queue.push(pos);
     }
 }
 
-///! join the chunkdata threads
+/// join the chunkdata threads
 pub fn join_data(mut voxel_engine: ResMut<VoxelEngine>) {
     let VoxelEngine {
         world_data,
@@ -383,9 +345,9 @@ pub struct WaitingToLoadMeshTag;
 
 pub fn promote_dirty_meshes(
     mut commands: Commands,
-    children: Query<(Entity, &Handle<Mesh>, &Parent), With<WaitingToLoadMeshTag>>,
+    children: &Query<(Entity, &Handle<Mesh>, &Parent), With<WaitingToLoadMeshTag>>,
     mut parents: Query<&mut Handle<Mesh>, Without<WaitingToLoadMeshTag>>,
-    asset_server: Res<AssetServer>,
+    asset_server: &Res<AssetServer>,
 ) {
     for (entity, handle, parent) in children.iter() {
         if let Some(state) = asset_server.get_load_state(handle) {
@@ -401,13 +363,14 @@ pub fn promote_dirty_meshes(
                 LoadState::Loading => {
                     info!("loading cool");
                 }
-                _ => (),
+                LoadState::NotLoaded => (),
             }
         }
     }
 }
 
-///! join the multithreaded chunk mesh tasks, and construct a finalized chunk entity
+/// join the multithreaded chunk mesh tasks, and construct a finalized chunk entity
+#[allow(clippy::needless_pass_by_value)]
 pub fn join_mesh(
     mut voxel_engine: ResMut<VoxelEngine>,
     mut commands: Commands,
@@ -441,8 +404,7 @@ pub fn join_mesh(
         );
         vertex_diagnostic.insert(*world_pos, mesh.vertices.len() as i32);
         bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, mesh.vertices.clone());
-        // bevy_mesh.set_indices(Some(Indices::U32(mesh.indices.clone().into())));
-        bevy_mesh.insert_indices(Indices::U32(mesh.indices.clone().into()));
+        bevy_mesh.insert_indices(Indices::U32(mesh.indices.clone()));
         let mesh_handle = meshes.add(bevy_mesh);
 
         if let Some(entity) = chunk_entities.get(world_pos) {

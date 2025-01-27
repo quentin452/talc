@@ -7,7 +7,7 @@ pub const DAY_TIME_SEC: f32 = 60.0;
 pub const NIGHT_TIME_SEC: f32 = 1.0;
 pub const CYCLE_TIME: f32 = DAY_TIME_SEC + NIGHT_TIME_SEC;
 
-///! current time of day
+/// current time of day
 #[derive(Resource)]
 struct SkyTime(pub f32);
 
@@ -42,6 +42,7 @@ impl Plugin for SunPlugin {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn daylight_cycle(
     mut query: Query<(&mut Transform, &mut DirectionalLight), With<Sun>>,
     mut timer: ResMut<SkyTime>,
@@ -68,10 +69,10 @@ fn daylight_cycle(
 
     let day = (timer.0 / DAY_TIME_SEC).min(1.0);
     let night = ((timer.0 - DAY_TIME_SEC) / NIGHT_TIME_SEC).max(0.0);
-    let percent = day * std::f32::consts::PI + night * std::f32::consts::PI;
+    let percent = day.mul_add(std::f32::consts::PI, night * std::f32::consts::PI);
 
-    for (mut light_trans, mut directional) in query.iter_mut() {
+    for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));
-        directional.illuminance = percent.sin().max(0.0).powf(2.0) * sun_settings.illuminance;
+        directional.illuminance = percent.sin().max(0.0).powi(2) * sun_settings.illuminance;
     }
 }

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use new_voxel_testing::chunk::ChunkData;
+use talc::chunk::ChunkData;
 
 fn bench_chunk(world_pos: IVec3) {
     let _chunk = ChunkData::generate(world_pos);

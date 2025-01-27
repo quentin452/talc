@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Instant};
 
 use bevy::{math::IVec3, utils::HashMap};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use new_voxel_testing::{
+use talc::{
     chunk::ChunkData,
     chunks_refs::ChunksRefs,
     culled_mesher, culled_mesher_optimized, greedy_mesher, greedy_mesher_optimized,

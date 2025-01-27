@@ -1,6 +1,6 @@
 use bevy::math::{ivec3, IVec3};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use new_voxel_testing::{
+use talc::{
     chunks_refs::ChunksRefs,
     constants::{CHUNK_SIZE, CHUNK_SIZE_I32, CHUNK_SIZE_P},
     utils::vec3_to_index,

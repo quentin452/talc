@@ -8,7 +8,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ChunkData {
-    pub voxels: Vec<BlockType>,
+    pub voxels: Box<[BlockType]>,
 }
 
 impl ChunkData {
@@ -39,13 +39,13 @@ impl ChunkData {
         // hardcoded extremity check
         if chunk_pos.y * 32 + 32 > 21 + 32 {
             return Self {
-                voxels: vec![BlockType::Air],
+                voxels: [BlockType::Air].into(),
             };
         }
         // hardcoded extremity check
         if chunk_pos.y * 32 < -21 - 32 {
             return Self {
-                voxels: vec![BlockType::Grass],
+                voxels: [BlockType::Grass].into(),
             };
         }
         let mut voxels = vec![];
@@ -76,6 +76,6 @@ impl ChunkData {
             voxels.push(block_type);
         }
 
-        Self { voxels }
+        Self { voxels: voxels.as_slice().into() }
     }
 }

@@ -14,10 +14,10 @@ use crate::{
     voxel::BlockType,
 };
 
-// pointers to chunk data, a middle one with all their neighbours
+// Pointers to chunk data, repersented as the middle one with all their neighbours in 3x3x3 cube.
 #[derive(Clone)]
 pub struct ChunksRefs {
-    pub chunks: Vec<Arc<ChunkData>>,
+    pub adjacent_chunks: [Arc<ChunkData>; 27],
 }
 
 impl ChunksRefs {
@@ -29,25 +29,24 @@ impl ChunksRefs {
         world_data: &HashMap<IVec3, Arc<ChunkData>>,
         middle_chunk: IVec3,
     ) -> Option<Self> {
-        let mut chunks = vec![];
-        for i in 0..3 * 3 * 3 {
-            let offset = index_to_ivec3_bounds(i, 3) + IVec3::splat(-1);
-            chunks.push(Arc::clone(
+        let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {
+            let offset = index_to_ivec3_bounds(i as i32, 3) + IVec3::NEG_ONE;
+            Arc::clone(
                 world_data.get(&(middle_chunk + offset)).unwrap(),
-            ));
-        }
-        Some(Self { chunks })
+            )
+        });
+        Some(Self { adjacent_chunks })
     }
     // returns if all the voxels are the same
     // this is an incredibly fast approximation (1 sample per chunk) all = voxels[0]
     // so may be inacurate, but the odds are incredibly low
     #[must_use]
     pub fn is_all_voxels_same(&self) -> bool {
-        let first_block = self.chunks[0].get_block_if_filled();
+        let first_block = self.adjacent_chunks[0].get_block_if_filled();
         let Some(block) = first_block else {
             return false;
         };
-        for chunk in &self.chunks[1..] {
+        for chunk in &self.adjacent_chunks[1..] {
             let option = chunk.get_block_if_filled();
             if let Some(v) = option {
                 if block != v {
@@ -60,21 +59,25 @@ impl ChunksRefs {
         true
     }
 
-    /// only use for testing purposes
+    /// Only used for test suite.
     #[must_use]
     pub fn make_dummy_chunk_refs(seed: u64) -> Self {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let mut chunks = vec![];
+        
         let pos = IVec3::new(
             rng.gen_range(-20..20),
             rng.gen_range(-5..5),
             rng.gen_range(-20..20),
         );
-        for i in 0..3 * 3 * 3 {
-            let offset = index_to_ivec3_bounds(i, 3) + IVec3::NEG_ONE;
-            chunks.push(Arc::new(ChunkData::generate(pos + offset)));
-        }
-        Self { chunks }
+
+        let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {
+            let offset = index_to_ivec3_bounds(i as i32, 3) + IVec3::NEG_ONE;
+            Arc::clone(
+                &Arc::new(ChunkData::generate(pos + offset)),
+            )
+        });
+
+        Self { adjacent_chunks }
     }
 
     /// helper function to get block data that may exceed the bounds of the middle chunk
@@ -89,7 +92,7 @@ impl ChunksRefs {
         let (z_chunk, z) = ((z / 32) as i32, (z % 32) as i32);
 
         let chunk_index = vec3_to_index(IVec3::new(x_chunk, y_chunk, z_chunk), 3);
-        let chunk_data = &self.chunks[chunk_index];
+        let chunk_data = &self.adjacent_chunks[chunk_index];
         let i = vec3_to_index(IVec3::new(x, y, z), 32);
         chunk_data.get_block(i)
     }
@@ -98,7 +101,7 @@ impl ChunksRefs {
     /// panics if the local pos is outside the middle chunk
     #[must_use]
     pub fn get_block_no_neighbour(&self, pos: IVec3) -> BlockType {
-        let chunk_data = &self.chunks[13];
+        let chunk_data = &self.adjacent_chunks[13];
         let i = vec3_to_index(pos, 32);
         chunk_data.get_block(i)
     }

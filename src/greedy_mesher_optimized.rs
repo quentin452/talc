@@ -45,7 +45,7 @@ use crate::{
     let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
 
     // inner chunk voxels.
-    let chunk = &*chunks_refs.chunks[vec3_to_index(IVec3::new(1, 1, 1), 3)];
+    let chunk = &*chunks_refs.adjacent_chunks[vec3_to_index(IVec3::new(1, 1, 1), 3)];
     assert!(chunk.voxels.len() == CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE || chunk.voxels.len() == 1);
     for z in 0..CHUNK_SIZE {
         for y in 0..CHUNK_SIZE {

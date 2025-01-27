@@ -297,11 +297,9 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
         for ChunkModification(local_pos, block_type) in mods {
             let i = vec3_to_index(local_pos, 32);
             if new_chunk_data.voxels.len() == 1 {
-                let mut voxels = vec![];
-                for _ in 0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32 {
-                    voxels.push(new_chunk_data.voxels[0]);
-                }
-                new_chunk_data.voxels = voxels;
+                new_chunk_data.voxels = (0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32).map(|_| {
+                    new_chunk_data.voxels[0]
+                }).collect();
             }
             new_chunk_data.voxels[i] = block_type;
             if let Some(edge_chunk) = get_edging_chunk(local_pos) {

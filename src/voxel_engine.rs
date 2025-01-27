@@ -8,7 +8,7 @@ use bevy::{
         mesh::Indices, primitives::Aabb, render_asset::RenderAssetUsages,
         render_resource::PrimitiveTopology,
     },
-    tasks::{block_on, AsyncComputeTaskPool, Task},
+    tasks::{AsyncComputeTaskPool, Task, block_on},
     utils::{HashMap, HashSet},
 };
 use bevy_screen_diagnostics::{Aggregate, ScreenDiagnostics};
@@ -19,7 +19,7 @@ use crate::{
     chunks_refs::ChunksRefs,
     constants::CHUNK_SIZE_I32,
     lod::Lod,
-    rendering::{GlobalChunkMaterial, ATTRIBUTE_VOXEL},
+    rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial},
     scanner::Scanner,
     utils::{get_edging_chunk, vec3_to_index},
     voxel::{BlockData, BlockType},

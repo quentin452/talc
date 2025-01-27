@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use talc::chunk::ChunkData;
 
 fn bench_chunk(world_pos: IVec3) {

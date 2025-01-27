@@ -1,5 +1,5 @@
 use crate::lod::Lod;
-use bevy::math::{ivec3, IVec3};
+use bevy::math::{IVec3, ivec3};
 
 // helper for transforming translations based dir or "axis"
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

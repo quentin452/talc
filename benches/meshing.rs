@@ -1,7 +1,9 @@
 use std::{sync::Arc, time::Instant};
 
 use bevy::{math::IVec3, utils::HashMap};
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use talc::{
     chunk::ChunkData,
     chunks_refs::ChunksRefs,
@@ -10,8 +12,6 @@ use talc::{
     utils::{index_to_ivec3, index_to_ivec3_bounds},
     voxel::{BlockData, BlockType},
 };
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
 
 fn bench_mesh(chunks_refs: ChunksRefs) {
     greedy_mesher::build_chunk_mesh(chunks_refs, Lod::L32);

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bevy::{
-    math::{ivec3, IVec3},
+    math::{IVec3, ivec3},
     utils::HashMap,
 };
 use rand::{Rng, SeedableRng};

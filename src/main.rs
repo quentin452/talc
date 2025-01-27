@@ -3,11 +3,11 @@ use std::f32::consts::PI;
 use bevy::{
     core::TaskPoolThreadAssignmentPolicy,
     math::{ivec3, vec3},
-    pbr::{wireframe::WireframePlugin, CascadeShadowConfigBuilder, ShadowFilteringMethod},
+    pbr::{CascadeShadowConfigBuilder, ShadowFilteringMethod, wireframe::WireframePlugin},
     prelude::*,
     render::{
-        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
         RenderPlugin,
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
     },
 };
 
@@ -137,13 +137,10 @@ pub fn setup(
     // ));
 
     commands
-        .spawn((
-            Scanner::new(12),
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 2.0, 0.5),
-                ..default()
-            },
-        ))
+        .spawn((Scanner::new(12), Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 2.0, 0.5),
+            ..default()
+        }))
         .insert(FlyCam);
 
     commands.insert_resource(GlobalChunkMaterial(chunk_materials.add(ChunkMaterial {

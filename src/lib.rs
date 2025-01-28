@@ -5,6 +5,7 @@ pub mod constants;
 pub mod face_direction;
 pub mod greedy_mesher_optimized;
 pub mod lod;
+pub mod position;
 pub mod quad;
 pub mod rendering;
 pub mod scanner;

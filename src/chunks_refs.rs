@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use bevy::{
-    math::{IVec3, ivec3},
-    utils::HashMap,
-};
+use bevy::{math::IVec3, utils::HashMap};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 use crate::{
-    chunk::ChunkData,
+    chunk::{ChunkData, VoxelIndex, CHUNK_SIZE, CHUNK_SIZE_I32},
+    position::{ChunkPosition, RelativePosition},
     quad::Direction,
-    utils::{index_to_ivec3_bounds, vec3_to_index},
+    utils::index_to_ivec3_bounds,
     voxel::BlockType,
 };
 
@@ -26,36 +24,48 @@ impl ChunksRefs {
     /// if `ChunkData` doesn't exist in input `world_data`
     #[must_use]
     pub fn try_new(
-        world_data: &HashMap<IVec3, Arc<ChunkData>>,
-        middle_chunk: IVec3,
+        world_data: &HashMap<ChunkPosition, Arc<ChunkData>>,
+        middle_chunk: ChunkPosition,
     ) -> Option<Self> {
-        let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {
-            let offset = index_to_ivec3_bounds(i as i32, 3) + IVec3::NEG_ONE;
-            Arc::clone(
-                world_data.get(&(middle_chunk + offset)).unwrap(),
-            )
-        });
+        let get_chunk = |i| {
+            let offset = ChunkPosition(index_to_ivec3_bounds(i, 3) + IVec3::NEG_ONE);
+            Some(Arc::clone(world_data.get(&(middle_chunk + offset))?))
+        };
+        #[rustfmt::skip]
+        let adjacent_chunks: [Arc<ChunkData>; 27] = [
+          get_chunk(0)?, get_chunk(1)?, get_chunk(2)?,
+          get_chunk(3)?, get_chunk(4)?, get_chunk(5)?,
+          get_chunk(6)?, get_chunk(7)?, get_chunk(8)?,
+
+          get_chunk(9)?, get_chunk(10)?, get_chunk(11)?,
+          get_chunk(12)?, get_chunk(13)?, get_chunk(14)?,
+          get_chunk(15)?, get_chunk(16)?, get_chunk(17)?,
+
+          get_chunk(18)?, get_chunk(19)?, get_chunk(20)?,
+          get_chunk(21)?, get_chunk(22)?, get_chunk(23)?,
+          get_chunk(24)?, get_chunk(25)?, get_chunk(26)?,
+        ];
         Some(Self { adjacent_chunks })
     }
 
     #[must_use]
     pub fn is_all_voxels_same(&self) -> bool {
         let block_type = if self.adjacent_chunks[0].is_homogenous() {
-            self.adjacent_chunks[0].get_block(0)
+            self.adjacent_chunks[0].get_block(0.into())
         } else {
             return false;
         };
-        self.adjacent_chunks.iter().all(|chunk| {
-            chunk.is_homogenous() && chunk.get_block(0) == block_type
-        })
+        self.adjacent_chunks
+            .iter()
+            .all(|chunk| chunk.is_homogenous() && chunk.get_block(0.into()) == block_type)
     }
 
     /// Only used for test suite.
     #[must_use]
     pub fn make_dummy_chunk_refs(seed: u64) -> Self {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        
-        let pos = IVec3::new(
+
+        let pos = ChunkPosition::new(
             rng.gen_range(-20..20),
             rng.gen_range(-5..5),
             rng.gen_range(-20..20),
@@ -63,9 +73,8 @@ impl ChunksRefs {
 
         let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {
             let offset = index_to_ivec3_bounds(i as i32, 3) + IVec3::NEG_ONE;
-            Arc::clone(
-                &Arc::new(ChunkData::generate(pos + offset)),
-            )
+            let chunk_position = pos + ChunkPosition(offset);
+            Arc::clone(&Arc::new(ChunkData::generate(chunk_position)))
         });
 
         Self { adjacent_chunks }
@@ -75,17 +84,18 @@ impl ChunksRefs {
     /// input position is local pos to middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block(&self, pos: IVec3) -> BlockType {
-        let x = (pos.x + 32) as u32;
-        let y = (pos.y + 32) as u32;
-        let z = (pos.z + 32) as u32;
-        let (x_chunk, x) = ((x / 32) as i32, (x % 32) as i32);
-        let (y_chunk, y) = ((y / 32) as i32, (y % 32) as i32);
-        let (z_chunk, z) = ((z / 32) as i32, (z % 32) as i32);
+    pub fn get_block(&self, pos: RelativePosition) -> BlockType {
+        let x = (pos.x() + CHUNK_SIZE_I32) as usize;
+        let y = (pos.y() + CHUNK_SIZE_I32) as usize;
+        let z = (pos.z() + CHUNK_SIZE_I32) as usize;
+        let (x_chunk, x) = ((x / CHUNK_SIZE) as i32, (x % CHUNK_SIZE));
+        let (y_chunk, y) = ((y / CHUNK_SIZE) as i32, (y % CHUNK_SIZE));
+        let (z_chunk, z) = ((z / CHUNK_SIZE) as i32, (z % CHUNK_SIZE));
 
-        let chunk_index = vec3_to_index(IVec3::new(x_chunk, y_chunk, z_chunk), 3);
+        let chunk_index = Self::vec3_to_chunk_index(IVec3::new(x_chunk, y_chunk, z_chunk));
         let chunk_data = &self.adjacent_chunks[chunk_index];
-        let i = vec3_to_index(IVec3::new(x, y, z), 32);
+        let i = VoxelIndex::new(x, y, z);
+
         chunk_data.get_block(i)
     }
 
@@ -93,41 +103,66 @@ impl ChunksRefs {
     /// panics if the local pos is outside the middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block_no_neighbour(&self, pos: IVec3) -> BlockType {
-        let chunk_data = &self.adjacent_chunks[13];
-        let i = vec3_to_index(pos, 32);
-        chunk_data.get_block(i)
+    pub fn get_block_no_neighbour(&self, pos: RelativePosition) -> BlockType {
+        let chunk_data: &Arc<ChunkData> = &self.adjacent_chunks[13];
+        chunk_data.get_block(pos.into())
     }
 
     /// helper function to sample adjacent(back,left,down) voxels
     #[must_use]
     pub fn get_adjacent_blocks(
         &self,
-        pos: IVec3,
+        pos: RelativePosition,
         // current back, left, down
     ) -> (BlockType, BlockType, BlockType, BlockType) {
         let current = self.get_block(pos);
-        let back = self.get_block(pos + ivec3(0, 0, -1));
-        let left = self.get_block(pos + ivec3(-1, 0, 0));
-        let down = self.get_block(pos + ivec3(0, -1, 0));
+        let back = self.get_block(pos + RelativePosition::new(0, 0, -1));
+        let left = self.get_block(pos + RelativePosition::new(-1, 0, 0));
+        let down = self.get_block(pos + RelativePosition::new(0, -1, 0));
         (current, back, left, down)
     }
 
     /// helper function to sample adjacent voxels, von neuman include all facing planes
     #[must_use]
-    pub fn get_von_neumann(&self, pos: IVec3) -> Option<Vec<(Direction, BlockType)>> {
+    pub fn get_von_neumann(&self, pos: RelativePosition) -> Option<Vec<(Direction, BlockType)>> {
         Some(vec![
-            (Direction::Back, self.get_block(pos + ivec3(0, 0, -1))),
-            (Direction::Forward, self.get_block(pos + ivec3(0, 0, 1))),
-            (Direction::Down, self.get_block(pos + ivec3(0, -1, 0))),
-            (Direction::Up, self.get_block(pos + ivec3(0, 1, 0))),
-            (Direction::Left, self.get_block(pos + ivec3(-1, 0, 0))),
-            (Direction::Right, self.get_block(pos + ivec3(1, 0, 0))),
+            (
+                Direction::Back,
+                self.get_block(pos + RelativePosition::new(0, 0, -1)),
+            ),
+            (
+                Direction::Forward,
+                self.get_block(pos + RelativePosition::new(0, 0, 1)),
+            ),
+            (
+                Direction::Down,
+                self.get_block(pos + RelativePosition::new(0, -1, 0)),
+            ),
+            (
+                Direction::Up,
+                self.get_block(pos + RelativePosition::new(0, 1, 0)),
+            ),
+            (
+                Direction::Left,
+                self.get_block(pos + RelativePosition::new(-1, 0, 0)),
+            ),
+            (
+                Direction::Right,
+                self.get_block(pos + RelativePosition::new(1, 0, 0)),
+            ),
         ])
     }
 
     #[must_use]
-    pub fn get_2(&self, pos: IVec3, offset: IVec3) -> (BlockType, BlockType) {
+    pub const fn vec3_to_chunk_index(vec: IVec3) -> usize {
+        let x_i = vec.x % 3;
+        let y_i = vec.y * 3;
+        let z_i = vec.z * (3 * 3);
+        (x_i + y_i + z_i) as usize
+    }
+
+    #[must_use]
+    pub fn get_2(&self, pos: RelativePosition, offset: RelativePosition) -> (BlockType, BlockType) {
         let first = self.get_block(pos);
         let second = self.get_block(pos + offset);
         (first, second)

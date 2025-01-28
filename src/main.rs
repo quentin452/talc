@@ -1,14 +1,10 @@
 use std::f32::consts::PI;
 
-use bevy::{
-    core::TaskPoolThreadAssignmentPolicy,
-    math::ivec3,
-    pbr::CascadeShadowConfigBuilder,
-    prelude::*,
-    render::{
-        settings::{RenderCreation, WgpuFeatures, WgpuSettings}, RenderPlugin
-    },
+use bevy::render::{
+    settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+    RenderPlugin,
 };
+use bevy::{core::TaskPoolThreadAssignmentPolicy, pbr::CascadeShadowConfigBuilder, prelude::*};
 
 use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
 use bevy_screen_diagnostics::{
@@ -16,10 +12,19 @@ use bevy_screen_diagnostics::{
 };
 
 use talc::{
+    chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32},
+    position::FloatingPosition,
     rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
         RenderingPlugin,
-    }, scanner::{Scanner, ScannerPlugin}, sun::SunPlugin, utils::world_to_chunk, voxel::BlockType, voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin}
+    },
+};
+use talc::{
+    position::RelativePosition,
+    scanner::{Scanner, ScannerPlugin},
+    sun::SunPlugin,
+    voxel::BlockType,
+    voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin},
 };
 
 use bevy_flycam::prelude::*;
@@ -78,30 +83,30 @@ pub fn modify_current_terrain(
     if !key.pressed(KeyCode::KeyN) {
         return;
     }
-    let cam_transform = query.single();
-    let cam_chunk = world_to_chunk(cam_transform.translation + (cam_transform.forward() * 64.0));
+    let camera_transform = query.single();
+    let looking_at_position = camera_transform.translation + (camera_transform.forward() * 64.0);
+    let looking_at_position = FloatingPosition(looking_at_position);
+    let camera_chunk = looking_at_position.into();
 
     let mut rng = rand::thread_rng();
     let mut mods = vec![];
-    for _i in 0..32 * 32 {
-        let pos = ivec3(
-            rng.gen_range(0..32),
-            rng.gen_range(0..32),
-            rng.gen_range(0..32),
+    for _ in 0..CHUNK_SIZE2 {
+        let pos = RelativePosition::new(
+            rng.gen_range(0..CHUNK_SIZE_I32),
+            rng.gen_range(0..CHUNK_SIZE_I32),
+            rng.gen_range(0..CHUNK_SIZE_I32),
         );
         mods.push(ChunkModification(pos, BlockType::Air));
     }
-    voxel_engine.chunk_modifications.insert(cam_chunk, mods);
+    voxel_engine.chunk_modifications.insert(camera_chunk, mods);
 }
 
 pub fn setup(
     mut commands: Commands,
     mut chunk_materials: ResMut<Assets<ChunkMaterial>>,
     mut chunk_materials_wireframe: ResMut<Assets<ChunkMaterialWireframe>>,
-    #[allow(unused)]
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    #[allow(unused)]
-    mut meshes: ResMut<Assets<Mesh>>,
+    #[allow(unused)] mut materials: ResMut<Assets<StandardMaterial>>,
+    #[allow(unused)] mut meshes: ResMut<Assets<Mesh>>,
 ) {
     commands.spawn((
         Name::new("Sun"),
@@ -134,10 +139,13 @@ pub fn setup(
     // ));
 
     commands
-        .spawn((Scanner::new(12), Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 2.0, 0.5),
-            ..default()
-        }))
+        .spawn((
+            Scanner::new(12),
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 2.0, 0.5),
+                ..default()
+            },
+        ))
         .insert(FlyCam);
 
     commands.insert_resource(GlobalChunkMaterial(chunk_materials.add(ChunkMaterial {

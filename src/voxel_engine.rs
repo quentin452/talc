@@ -8,19 +8,20 @@ use bevy::{
         mesh::Indices, primitives::Aabb, render_asset::RenderAssetUsages,
         render_resource::PrimitiveTopology,
     },
-    tasks::{AsyncComputeTaskPool, Task, block_on},
+    tasks::{block_on, AsyncComputeTaskPool, Task},
     utils::{HashMap, HashSet},
 };
 use bevy_screen_diagnostics::{Aggregate, ScreenDiagnostics};
 
 use crate::{
-    chunk::ChunkData,
+    chunk::{ChunkData, CHUNK_SIZE_F32},
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     lod::Lod,
+    position::{ChunkPosition, FloatingPosition, Position, RelativePosition},
     rendering::{GlobalChunkMaterial, ATTRIBUTE_VOXEL},
     scanner::Scanner,
-    utils::{get_edging_chunk, vec3_to_index},
+    utils::get_edging_chunk,
     voxel::BlockType,
 };
 use futures_lite::future;
@@ -57,20 +58,20 @@ impl Plugin for VoxelEnginePlugin {
 /// holds all voxel world data
 #[derive(Resource)]
 pub struct VoxelEngine {
-    pub world_data: HashMap<IVec3, Arc<ChunkData>>,
-    pub vertex_diagnostic: HashMap<IVec3, i32>,
-    pub load_data_queue: Vec<IVec3>,
-    pub load_mesh_queue: Vec<IVec3>,
-    pub unload_data_queue: Vec<IVec3>,
-    pub unload_mesh_queue: Vec<IVec3>,
-    pub data_tasks: HashMap<IVec3, Option<Task<ChunkData>>>,
-    pub mesh_tasks: Vec<(IVec3, Option<Task<Option<ChunkMesh>>>)>,
-    pub chunk_entities: HashMap<IVec3, Entity>,
+    pub world_data: HashMap<ChunkPosition, Arc<ChunkData>>,
+    pub vertex_diagnostic: HashMap<ChunkPosition, i32>,
+    pub load_data_queue: Vec<ChunkPosition>,
+    pub load_mesh_queue: Vec<ChunkPosition>,
+    pub unload_data_queue: Vec<ChunkPosition>,
+    pub unload_mesh_queue: Vec<ChunkPosition>,
+    pub data_tasks: HashMap<ChunkPosition, Option<Task<ChunkData>>>,
+    pub mesh_tasks: Vec<(ChunkPosition, Option<Task<Option<ChunkMesh>>>)>,
+    pub chunk_entities: HashMap<ChunkPosition, Entity>,
     pub lod: Lod,
-    pub chunk_modifications: HashMap<IVec3, Vec<ChunkModification>>,
+    pub chunk_modifications: HashMap<ChunkPosition, Vec<ChunkModification>>,
 }
 
-pub struct ChunkModification(pub IVec3, pub BlockType);
+pub struct ChunkModification(pub RelativePosition, pub BlockType);
 
 const DIAG_LOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("load_data_queue");
 const DIAG_UNLOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("unload_data_queue");
@@ -128,11 +129,13 @@ fn diagnostics_count(mut diagnostics: Diagnostics, voxel_engine: Res<VoxelEngine
     diagnostics.add_measurement(&DIAG_MESH_TASKS, || voxel_engine.mesh_tasks.len() as f64);
     diagnostics.add_measurement(&DIAG_DATA_TASKS, || voxel_engine.data_tasks.len() as f64);
     diagnostics.add_measurement(&DIAG_VERTEX_COUNT, || {
-        f64::from(voxel_engine
-            .vertex_diagnostic
-            .iter()
-            .map(|(_, v)| v)
-            .sum::<i32>())
+        f64::from(
+            voxel_engine
+                .vertex_diagnostic
+                .iter()
+                .map(|(_, v)| v)
+                .sum::<i32>(),
+        )
     });
 }
 
@@ -142,8 +145,8 @@ impl VoxelEngine {
         self.load_mesh_queue.clear();
         // self.unload_mesh_queue.clear();
         self.mesh_tasks.clear();
-        let scan_pos =
-            ((scanner_transform.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
+        let translation = Position(scanner_transform.translation().as_ivec3());
+        let scan_pos: ChunkPosition = translation.into();
         for offset in &scanner.mesh_sampling_offsets {
             let wpos = scan_pos + *offset;
             self.load_mesh_queue.push(wpos);
@@ -163,7 +166,7 @@ impl Default for VoxelEngine {
             data_tasks: HashMap::new(),
             mesh_tasks: Vec::new(),
             chunk_entities: HashMap::new(),
-            lod: Lod::L32,
+            lod: Lod::L16,
             vertex_diagnostic: HashMap::new(),
             chunk_modifications: HashMap::new(),
         }
@@ -185,23 +188,22 @@ pub fn start_data_tasks(
     } = voxel_engine.as_mut();
 
     let scanner_g = scanners.single();
-    let scan_pos = ((scanner_g.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
+
+    let translation = Position(scanner_g.translation().as_ivec3());
+    let scan_pos: ChunkPosition = translation.into();
+
     load_data_queue.sort_by(|a, b| {
-        a.distance_squared(scan_pos)
-            .cmp(&b.distance_squared(scan_pos))
+        a.0.distance_squared(scan_pos.0)
+            .cmp(&b.0.distance_squared(scan_pos.0))
     });
 
     let tasks_left = (MAX_DATA_TASKS as i32 - data_tasks.len() as i32)
         .min(load_data_queue.len() as i32)
         .max(0) as usize;
-    for world_pos in load_data_queue.drain(0..tasks_left) {
-        // for world_pos in load_data_queue.drain(0..MAX_DATA_TASKS.min(load_data_queue.len())) {
-        // for world_pos in load_data_queue.drain(..) {
-        let k = world_pos;
-        let task = task_pool.spawn(async move {
-            ChunkData::generate(k)
-        });
-        data_tasks.insert(world_pos, Some(task));
+    for chunk_position in load_data_queue.drain(0..tasks_left) {
+        let k = chunk_position;
+        let task = task_pool.spawn(async move { ChunkData::generate(k) });
+        data_tasks.insert(chunk_position, Some(task));
     }
 }
 
@@ -258,15 +260,14 @@ pub fn start_mesh_tasks(
     let scanner_g = scanners.single();
     let scan_pos = ((scanner_g.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
     load_mesh_queue.sort_by(|a, b| {
-        a.distance_squared(scan_pos)
-            .cmp(&b.distance_squared(scan_pos))
+        a.0.distance_squared(scan_pos)
+            .cmp(&b.0.distance_squared(scan_pos))
     });
     let tasks_left = (MAX_MESH_TASKS as i32 - mesh_tasks.len() as i32)
         .min(load_mesh_queue.len() as i32)
         .max(0) as usize;
-    for world_pos in load_mesh_queue.drain(0..tasks_left) {
-        // for world_pos in load_mesh_queue.drain(..) {
-        let Some(chunks_refs) = ChunksRefs::try_new(world_data, world_pos) else {
+    for chunk_position in load_mesh_queue.drain(0..tasks_left) {
+        let Some(chunks_refs) = ChunksRefs::try_new(world_data, chunk_position) else {
             continue;
         };
         let llod = *lod;
@@ -274,7 +275,7 @@ pub fn start_mesh_tasks(
             crate::greedy_mesher_optimized::build_chunk_mesh(&chunks_refs, llod)
         });
 
-        mesh_tasks.push((world_pos, Some(task)));
+        mesh_tasks.push((chunk_position, Some(task)));
     }
 }
 
@@ -293,8 +294,7 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
         let new_chunk_data = Arc::make_mut(chunk_data);
         let mut adj_chunk_set = HashSet::new();
         for ChunkModification(local_pos, block_type) in mods {
-            let i = vec3_to_index(local_pos, 32);
-            new_chunk_data.set_block(i, block_type);
+            new_chunk_data.set_block(local_pos.into(), block_type);
             if let Some(edge_chunk) = get_edging_chunk(local_pos) {
                 adj_chunk_set.insert(edge_chunk);
             }
@@ -313,7 +313,7 @@ pub fn join_data(mut voxel_engine: ResMut<VoxelEngine>) {
         data_tasks,
         ..
     } = voxel_engine.as_mut();
-    for (world_pos, task_option) in data_tasks.iter_mut() {
+    for (chunk_position, task_option) in data_tasks.iter_mut() {
         let Some(mut task) = task_option.take() else {
             // should never happend, because we drop None values later
             warn!("someone modified task?");
@@ -324,7 +324,7 @@ pub fn join_data(mut voxel_engine: ResMut<VoxelEngine>) {
             continue;
         };
 
-        world_data.insert(*world_pos, Arc::new(chunk_data));
+        world_data.insert(*chunk_position, Arc::new(chunk_data));
     }
     data_tasks.retain(|_k, op| op.is_some());
 }
@@ -372,7 +372,7 @@ pub fn join_mesh(
         vertex_diagnostic,
         ..
     } = voxel_engine.as_mut();
-    for (world_pos, task_option) in mesh_tasks.iter_mut() {
+    for (chunk_position, task_option) in mesh_tasks.iter_mut() {
         let Some(mut task) = task_option.take() else {
             // should never happend, because we drop None values later
             warn!("someone modified task?");
@@ -391,28 +391,30 @@ pub fn join_mesh(
             PrimitiveTopology::TriangleList,
             RenderAssetUsages::RENDER_WORLD,
         );
-        vertex_diagnostic.insert(*world_pos, mesh.vertices.len() as i32);
+        vertex_diagnostic.insert(*chunk_position, mesh.vertices.len() as i32);
         bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, mesh.vertices.clone());
         bevy_mesh.insert_indices(Indices::U32(mesh.indices.clone()));
         let mesh_handle = meshes.add(bevy_mesh);
 
-        if let Some(entity) = chunk_entities.get(world_pos) {
+        if let Some(entity) = chunk_entities.get(chunk_position) {
             commands.entity(*entity).despawn();
         }
 
         // spawn chunk entity
         let chunk_entity = commands
             .spawn((
-                Aabb::from_min_max(Vec3::ZERO, Vec3::splat(32.0)),
+                Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
                 MaterialMeshBundle {
-                    transform: Transform::from_translation(world_pos.as_vec3() * Vec3::splat(32.0)),
+                    transform: Transform::from_translation(
+                        FloatingPosition::from(*chunk_position).0,
+                    ),
                     mesh: mesh_handle,
                     material: global_chunk_material.0.clone(),
                     ..default()
                 },
             ))
             .id();
-        chunk_entities.insert(*world_pos, chunk_entity);
+        chunk_entities.insert(*chunk_position, chunk_entity);
     }
     mesh_tasks.retain(|(_p, op)| op.is_some());
 }

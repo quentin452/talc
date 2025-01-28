@@ -1,5 +1,5 @@
 use crate::lod::Lod;
-use bevy::math::{IVec3, ivec3};
+use bevy::math::{ivec3, IVec3};
 
 // helper for transforming translations based dir or "axis"
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -40,7 +40,8 @@ impl FaceDir {
     }
 
     /// offset input position with this face direction
-    #[must_use] pub const fn world_to_sample(&self, axis: i32, x: i32, y: i32, _lod: &Lod) -> IVec3 {
+    #[must_use]
+    pub const fn world_to_sample(&self, axis: i32, x: i32, y: i32, _lod: &Lod) -> IVec3 {
         match self {
             Self::Up => ivec3(x, axis + 1, y),
             Self::Down => ivec3(x, axis, y),
@@ -66,7 +67,8 @@ impl FaceDir {
     }
 
     /// get delta for traversing the previous axis pos
-    #[must_use] pub const fn negate_axis(&self) -> i32 {
+    #[must_use]
+    pub const fn negate_axis(&self) -> i32 {
         match self {
             Self::Up => -1,     //+1
             Self::Down => 0,    //-1

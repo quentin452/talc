@@ -1,42 +1,37 @@
-use bevy::{
-    math::{IVec2, ivec2},
-    prelude::IVec3,
-};
+use bevy::math::{ivec2, IVec2};
 
-pub const ADJACENT_CHUNK_DIRECTIONS: [IVec3; 27] = [
-    IVec3 { x: 0, y: 0, z: 0 },
+use crate::position::ChunkPosition;
+
+pub const ADJACENT_CHUNK_DIRECTIONS: [ChunkPosition; 27] = [
+    ChunkPosition::new(0, 0, 0),
     // moore neighbours in the negative direction
-    IVec3 { x: 0, y: -1, z: -1 },
-    IVec3 { x: -1, y: 0, z: -1 },
-    IVec3 { x: -1, y: 0, z: 1 },
-    IVec3 { x: -1, y: -1, z: 0 },
-    IVec3 {
-        x: -1,
-        y: -1,
-        z: -1,
-    },
-    IVec3 { x: -1, y: 1, z: -1 },
-    IVec3 { x: -1, y: -1, z: 1 },
-    IVec3 { x: -1, y: 1, z: 1 },
-    IVec3 { x: 1, y: 0, z: -1 },
-    IVec3 { x: 1, y: -1, z: -1 },
-    IVec3 { x: 0, y: 1, z: -1 },
-    IVec3 { x: 1, y: 1, z: 1 },
-    IVec3 { x: 1, y: -1, z: 1 },
-    IVec3 { x: 1, y: 1, z: -1 },
-    IVec3 { x: 1, y: 1, z: 0 },
-    IVec3 { x: 0, y: 1, z: 1 },
-    IVec3 { x: 1, y: -1, z: 0 },
-    IVec3 { x: 0, y: -1, z: 1 },
-    IVec3 { x: 1, y: 0, z: 1 },
-    IVec3 { x: -1, y: 1, z: 0 },
+    ChunkPosition::new(0, 1, 1),
+    ChunkPosition::new(-1, 0, 1),
+    ChunkPosition::new(-1, 0, 1),
+    ChunkPosition::new(-1, 1, 0),
+    ChunkPosition::new(-1, 1, 1),
+    ChunkPosition::new(-1, 1, 1),
+    ChunkPosition::new(-1, 1, 1),
+    ChunkPosition::new(-1, 1, 1),
+    ChunkPosition::new(1, 0, 1),
+    ChunkPosition::new(1, 1, 1),
+    ChunkPosition::new(0, 1, 1),
+    ChunkPosition::new(1, 1, 1),
+    ChunkPosition::new(1, 1, 1),
+    ChunkPosition::new(1, 1, 1),
+    ChunkPosition::new(1, 1, 0),
+    ChunkPosition::new(0, 1, 1),
+    ChunkPosition::new(1, 1, 0),
+    ChunkPosition::new(0, 1, 1),
+    ChunkPosition::new(1, 0, 1),
+    ChunkPosition::new(-1, 1, 0),
     // von neumann neighbour
-    IVec3 { x: -1, y: 0, z: 0 },
-    IVec3 { x: 1, y: 0, z: 0 },
-    IVec3 { x: 0, y: -1, z: 0 },
-    IVec3 { x: 0, y: 1, z: 0 },
-    IVec3 { x: 0, y: 0, z: -1 },
-    IVec3 { x: 0, y: 0, z: 1 },
+    ChunkPosition::new(-1, 0, 0),
+    ChunkPosition::new(1, 0, 0),
+    ChunkPosition::new(0, 1, 0),
+    ChunkPosition::new(0, 1, 0),
+    ChunkPosition::new(0, 0, 1),
+    ChunkPosition::new(0, 0, 1),
 ];
 
 pub const ADJACENT_AO_DIRS: [IVec2; 9] = [

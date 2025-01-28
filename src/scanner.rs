@@ -1,9 +1,17 @@
+/*!
+scanner is responsible for identifying what chunks needs to be loaded (mesh/data)
+the current implementation is exellent for low render distances, 1-15
+but anything above that might induce some frame lag, due to how the load/unload data is calculated.
+`scanner::new()` can also be very slow on high render distances, giving an initial slow execution time.
+*/
+
 use std::collections::VecDeque;
 
 use bevy::{prelude::*, utils::HashSet};
 
 use crate::{
-    constants::ADJACENT_CHUNK_DIRECTIONS, utils::index_to_ivec3_bounds, voxel_engine::VoxelEngine,
+    chunk::CHUNK_SIZE_I32, constants::ADJACENT_CHUNK_DIRECTIONS, position::ChunkPosition,
+    utils::index_to_ivec3_bounds, voxel_engine::VoxelEngine,
 };
 
 pub const MAX_DATA_TASKS: usize = 9;
@@ -28,15 +36,9 @@ impl Plugin for ScannerPlugin {
     }
 }
 
-/**
-scanner is responsible for identifying what chunks needs to be loaded (mesh/data)
-the current implementation is exellent for low render distances, 1-15
-but anything above that might induce some frame lag, due to how the load/unload data is calculated.  
-`scanner::new()` can also be very slow on high render distances, giving an initial slow execution time.
-*/
 #[derive(Component)]
 pub struct Scanner {
-    pub prev_chunk_pos: IVec3,
+    pub prev_chunk_pos: ChunkPosition,
     /// how many chunks we visit
     pub checks_per_frame: usize,
     /// offset grid sampling over frames
@@ -45,23 +47,24 @@ pub struct Scanner {
     pub mesh_offset: usize,
 
     // chunk positions we are yet to check we need need to load
-    pub unresolved_data_load: Vec<IVec3>,
-    pub unresolved_mesh_load: Vec<IVec3>,
+    pub unresolved_data_load: Vec<ChunkPosition>,
+    pub unresolved_mesh_load: Vec<ChunkPosition>,
 
     // chunk positions we are yet to check we need need tounload
-    pub unresolved_data_unload: VecDeque<IVec3>,
-    pub unresolved_mesh_unload: VecDeque<IVec3>,
+    pub unresolved_data_unload: VecDeque<ChunkPosition>,
+    pub unresolved_mesh_unload: VecDeque<ChunkPosition>,
 
     // on detecting a scanner move, these offsets are used to
     // identify the location of what chunks need to be checked
-    pub data_sampling_offsets: Vec<IVec3>,
-    pub mesh_sampling_offsets: Vec<IVec3>,
+    pub data_sampling_offsets: Vec<ChunkPosition>,
+    pub mesh_sampling_offsets: Vec<ChunkPosition>,
 }
 
 impl Scanner {
     /// construct scanner, chunk offsets are based on distance
     /// warning: slow execution time on distances above 15-20,
-    #[must_use] pub fn new(distance: i32) -> Self {
+    #[must_use]
+    pub fn new(distance: i32) -> Self {
         let data_distance = distance + 1;
         let mesh_distance = distance;
         let data_sampling_offsets = make_offset_vec(data_distance);
@@ -73,7 +76,7 @@ impl Scanner {
             mesh_sampling_offsets,
             mesh_offset: 0,
             unresolved_data_load: Vec::default(),
-            prev_chunk_pos: IVec3::new(777, 777, 777),
+            prev_chunk_pos: ChunkPosition::new(777, 777, 777),
             unresolved_mesh_load: Vec::default(),
             unresolved_data_unload: VecDeque::default(),
             unresolved_mesh_unload: VecDeque::default(),
@@ -87,7 +90,9 @@ fn detect_move(
     mut voxel_engine: ResMut<VoxelEngine>,
 ) {
     for (mut scanner, g_transform) in &mut scanners {
-        let chunk_pos = ((g_transform.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
+        let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
+            / CHUNK_SIZE_I32;
+        let chunk_pos = ChunkPosition(chunk_pos);
         let previous_chunk_pos = scanner.prev_chunk_pos;
         let chunk_pos_changed = chunk_pos != scanner.prev_chunk_pos;
         scanner.prev_chunk_pos = chunk_pos;
@@ -98,25 +103,25 @@ fn detect_move(
             .data_sampling_offsets
             .iter()
             .map(|offset| chunk_pos + *offset)
-            .collect::<HashSet<IVec3>>();
+            .collect::<HashSet<ChunkPosition>>();
 
         let unload_data_area = scanner
             .data_sampling_offsets
             .iter()
             .map(|offset| previous_chunk_pos + *offset)
-            .collect::<HashSet<IVec3>>();
+            .collect::<HashSet<ChunkPosition>>();
 
         let load_mesh_area = scanner
             .mesh_sampling_offsets
             .iter()
             .map(|offset| chunk_pos + *offset)
-            .collect::<HashSet<IVec3>>();
+            .collect::<HashSet<ChunkPosition>>();
 
         let unload_mesh_area = scanner
             .mesh_sampling_offsets
             .iter()
             .map(|offset| previous_chunk_pos + *offset)
-            .collect::<HashSet<IVec3>>();
+            .collect::<HashSet<ChunkPosition>>();
 
         let data_load = load_data_area.difference(&unload_data_area);
         let data_unload = unload_data_area.difference(&load_data_area);
@@ -170,29 +175,28 @@ fn detect_move(
         });
 
         scanner.unresolved_mesh_load.sort_by(|a, b| {
-            a.distance_squared(chunk_pos)
-                .cmp(&b.distance_squared(chunk_pos))
+            a.0.distance_squared(chunk_pos.0)
+                .cmp(&b.0.distance_squared(chunk_pos.0))
         });
         scanner.unresolved_data_load.sort_by(|a, b| {
-            a.distance_squared(chunk_pos)
-                .cmp(&b.distance_squared(chunk_pos))
+            a.0.distance_squared(chunk_pos.0)
+                .cmp(&b.0.distance_squared(chunk_pos.0))
         });
     }
 }
 
-/// constructs spherical positions with the provided chunk radius
-fn make_offset_vec(half: i32) -> Vec<IVec3> {
+/// constructs spherical chunk positions with the provided chunk radius
+fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
     let k = (half * 2) + 1;
     let mut sampling_offsets = vec![];
     for i in 0..k * k * k {
         let mut pos = index_to_ivec3_bounds(i, k);
         pos -= IVec3::splat((k as f32 * 0.5) as i32);
-
-        sampling_offsets.push(pos);
+        sampling_offsets.push(ChunkPosition(pos));
     }
     sampling_offsets.sort_by(|a, b| {
-        a.distance_squared(IVec3::ZERO)
-            .cmp(&b.distance_squared(IVec3::ZERO))
+        a.0.distance_squared(IVec3::ZERO)
+            .cmp(&b.0.distance_squared(IVec3::ZERO))
     });
     sampling_offsets
 }
@@ -215,14 +219,11 @@ pub fn scan_data(
             if !is_busy {
                 voxel_engine.load_data_queue.push(chunk_pos);
                 // abort unload
-                let index_of_unloading =
-                    voxel_engine.unload_data_queue.iter().enumerate().find_map(
-                        |(i, pos)| if pos == &chunk_pos {
-                            Some(i)
-                        } else {
-                            None
-                        },
-                    );
+                let index_of_unloading = voxel_engine
+                    .unload_data_queue
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, pos)| if pos == &chunk_pos { Some(i) } else { None });
                 if let Some(i) = index_of_unloading {
                     voxel_engine.unload_data_queue.remove(i);
                 }
@@ -276,14 +277,11 @@ pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<Vox
             } else {
                 voxel_engine.load_mesh_queue.push(chunk_pos);
                 // abort unload
-                let index_of_unloading =
-                    voxel_engine.unload_mesh_queue.iter().enumerate().find_map(
-                        |(i, pos)| if pos == &chunk_pos {
-                            Some(i)
-                        } else {
-                            None
-                        },
-                    );
+                let index_of_unloading = voxel_engine
+                    .unload_mesh_queue
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, pos)| if pos == &chunk_pos { Some(i) } else { None });
                 if let Some(i) = index_of_unloading {
                     voxel_engine.unload_mesh_queue.remove(i);
                 }

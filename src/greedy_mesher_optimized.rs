@@ -1,30 +1,38 @@
 use std::collections::VecDeque;
 
-use bevy::{math::ivec3, prelude::*, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    chunk::{CHUNK_SIZE, CHUNK_SIZE3, CHUNK_SIZE_P}, chunk_mesh::ChunkMesh, chunks_refs::ChunksRefs, constants::ADJACENT_AO_DIRS, face_direction::FaceDir, lod::Lod, utils::{generate_indices, make_vertex_u32, vec3_to_index}
+    chunk::{CHUNK_SIZE, CHUNK_SIZE3, CHUNK_SIZE_P},
+    chunk_mesh::ChunkMesh,
+    chunks_refs::ChunksRefs,
+    constants::ADJACENT_AO_DIRS,
+    face_direction::FaceDir,
+    lod::Lod,
+    position::RelativePosition,
+    utils::{generate_indices, make_vertex_u32},
 };
 
-#[must_use] pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
-    #[inline]
-    fn add_voxel_to_axis_cols(
-        block: crate::voxel::BlockType,
-        x: usize,
-        y: usize,
-        z: usize,
-        axis_cols: &mut [[[u64; 34]; 34]; 3],
-    ) {
-        if block.is_solid() {
-            // x,z - y axis
-            axis_cols[0][z][x] |= 1u64 << y as u64;
-            // z,y - x axis
-            axis_cols[1][y][z] |= 1u64 << x as u64;
-            // x,y - z axis
-            axis_cols[2][y][x] |= 1u64 << z as u64;
-        }
+#[inline]
+fn add_voxel_to_axis_cols(
+    block: crate::voxel::BlockType,
+    x: usize,
+    y: usize,
+    z: usize,
+    axis_cols: &mut [[[u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 3],
+) {
+    if block.is_solid() {
+        // x,z - y axis
+        axis_cols[0][z][x] |= 1u64 << y as u64;
+        // z,y - x axis
+        axis_cols[1][y][z] |= 1u64 << x as u64;
+        // x,y - z axis
+        axis_cols[2][y][x] |= 1u64 << z as u64;
     }
+}
 
+#[must_use]
+pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
@@ -40,14 +48,20 @@ use crate::{
     let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
 
     // inner chunk voxels.
-    let chunk = &*chunks_refs.adjacent_chunks[vec3_to_index(IVec3::new(1, 1, 1), 3)];
-    
+    let chunk = &*chunks_refs.adjacent_chunks[ChunksRefs::vec3_to_chunk_index(IVec3::new(1, 1, 1))];
+
     {
         let mut x = 0;
         let mut y = 0;
         let mut z = 0;
         for i in 0..CHUNK_SIZE3 {
-            add_voxel_to_axis_cols(chunk.get_block(i), x + 1, y + 1, z + 1, &mut axis_cols);
+            add_voxel_to_axis_cols(
+                chunk.get_block(i.into()),
+                x + 1,
+                y + 1,
+                z + 1,
+                &mut axis_cols,
+            );
 
             x += 1;
             if x == CHUNK_SIZE {
@@ -68,7 +82,7 @@ use crate::{
     for z in [0, CHUNK_SIZE_P - 1] {
         for y in 0..CHUNK_SIZE_P {
             for x in 0..CHUNK_SIZE_P {
-                let pos = ivec3(x as i32, y as i32, z as i32) - IVec3::ONE;
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -76,7 +90,7 @@ use crate::{
     for z in 0..CHUNK_SIZE_P {
         for y in [0, CHUNK_SIZE_P - 1] {
             for x in 0..CHUNK_SIZE_P {
-                let pos = ivec3(x as i32, y as i32, z as i32) - IVec3::ONE;
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -84,14 +98,14 @@ use crate::{
     for z in 0..CHUNK_SIZE_P {
         for x in [0, CHUNK_SIZE_P - 1] {
             for y in 0..CHUNK_SIZE_P {
-                let pos = ivec3(x as i32, y as i32, z as i32) - IVec3::ONE;
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
     }
 
     // face culling
-    for axis in 0..3 {
+    for axis in 0..=2 {
         for z in 0..CHUNK_SIZE_P {
             for x in 0..CHUNK_SIZE_P {
                 // set if current is solid, and next is air
@@ -110,7 +124,7 @@ use crate::{
     // note(leddoo): don't ask me how this isn't a massive blottleneck.
     //  might become an issue in the future, when there are more block types.
     //  consider using a single hashmap with key (axis, block_hash, y).
-    let mut data: [HashMap<u32, HashMap<u32, [u32; 32]>>; 6] = [
+    let mut data: [HashMap<u32, HashMap<u32, [u32; CHUNK_SIZE]>>; 6] = [
         HashMap::new(),
         HashMap::new(),
         HashMap::new(),
@@ -138,9 +152,9 @@ use crate::{
 
                     // get the voxel position based on axis
                     let voxel_pos = match axis {
-                        0 | 1 => ivec3(x as i32, y as i32, z as i32), // down,up
-                        2 | 3 => ivec3(y as i32, z as i32, x as i32), // left, right
-                        _ => ivec3(x as i32, z as i32, y as i32),     // forward, back
+                        0 | 1 => RelativePosition::new(x as i32, y as i32, z as i32), // down,up
+                        2 | 3 => RelativePosition::new(y as i32, z as i32, x as i32), // left, right
+                        _ => RelativePosition::new(x as i32, z as i32, y as i32), // forward, back
                     };
 
                     // calculate ambient occlusion
@@ -148,12 +162,12 @@ use crate::{
                     for (ao_i, ao_offset) in ADJACENT_AO_DIRS.iter().enumerate() {
                         // ambient occlusion is sampled based on axis(ascent or descent)
                         let ao_sample_offset = match axis {
-                            0 => ivec3(ao_offset.x, -1, ao_offset.y), // down
-                            1 => ivec3(ao_offset.x, 1, ao_offset.y),  // up
-                            2 => ivec3(-1, ao_offset.y, ao_offset.x), // left
-                            3 => ivec3(1, ao_offset.y, ao_offset.x),  // right
-                            4 => ivec3(ao_offset.x, ao_offset.y, -1), // forward
-                            _ => ivec3(ao_offset.x, ao_offset.y, 1),  // back
+                            0 => RelativePosition::new(ao_offset.x, -1, ao_offset.y), // down
+                            1 => RelativePosition::new(ao_offset.x, 1, ao_offset.y),  // up
+                            2 => RelativePosition::new(-1, ao_offset.y, ao_offset.x), // left
+                            3 => RelativePosition::new(1, ao_offset.y, ao_offset.x),  // right
+                            4 => RelativePosition::new(ao_offset.x, ao_offset.y, -1), // forward
+                            _ => RelativePosition::new(ao_offset.x, ao_offset.y, 1),  // back
                         };
                         let ao_voxel_pos = voxel_pos + ao_sample_offset;
                         let ao_block = chunks_refs.get_block(ao_voxel_pos);
@@ -194,7 +208,7 @@ use crate::{
                 let quads_from_axis = greedy_mesh_binary_plane(plane, lod.size() as u32);
 
                 for q in quads_from_axis {
-                    q.append_vertices(&mut vertices, facedir, axis_pos, &Lod::L32, ao, block_type);
+                    q.append_vertices(&mut vertices, facedir, axis_pos, &Lod::L16, ao, block_type);
                 }
             }
         }
@@ -247,12 +261,8 @@ impl GreedyQuad {
             block_type,
         );
         let v2 = make_vertex_u32(
-            face_dir.world_to_sample(
-                axis,
-                self.x as i32 + self.w as i32,
-                self.y as i32,
-                lod,
-            ) * jump,
+            face_dir.world_to_sample(axis, self.x as i32 + self.w as i32, self.y as i32, lod)
+                * jump,
             v2ao,
             face_dir.normal_index(),
             block_type,
@@ -269,12 +279,8 @@ impl GreedyQuad {
             block_type,
         );
         let v4 = make_vertex_u32(
-            face_dir.world_to_sample(
-                axis,
-                self.x as i32,
-                self.y as i32 + self.h as i32,
-                lod,
-            ) * jump,
+            face_dir.world_to_sample(axis, self.x as i32, self.y as i32 + self.h as i32, lod)
+                * jump,
             v4ao,
             face_dir.normal_index(),
             block_type,
@@ -304,7 +310,8 @@ impl GreedyQuad {
 
 /// generate quads of a binary slice
 /// lod not implemented atm
-#[must_use] pub fn greedy_mesh_binary_plane(mut data: [u32; 32], lod_size: u32) -> Vec<GreedyQuad> {
+#[must_use]
+pub fn greedy_mesh_binary_plane(mut data: [u32; CHUNK_SIZE], lod_size: u32) -> Vec<GreedyQuad> {
     let mut greedy_quads = vec![];
     for row in 0..data.len() {
         let mut y = 0;

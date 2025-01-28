@@ -14,7 +14,7 @@ use bevy::{
 use bevy_screen_diagnostics::{Aggregate, ScreenDiagnostics};
 
 use crate::{
-    chunk::{ChunkData, CHUNK_SIZE_F32},
+    chunk::{ChunkData, CHUNK_SIZE_F32, CHUNK_SIZE_I32},
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     lod::Lod,
@@ -157,6 +157,11 @@ impl VoxelEngine {
 
 impl Default for VoxelEngine {
     fn default() -> Self {
+        assert!(
+            Lod::default().size() == CHUNK_SIZE_I32,
+            "Default LOD must exactly equal the chunk size."
+        );
+
         Self {
             world_data: HashMap::new(),
             load_data_queue: Vec::new(),
@@ -166,7 +171,7 @@ impl Default for VoxelEngine {
             data_tasks: HashMap::new(),
             mesh_tasks: Vec::new(),
             chunk_entities: HashMap::new(),
-            lod: Lod::L16,
+            lod: Lod::default(),
             vertex_diagnostic: HashMap::new(),
             chunk_modifications: HashMap::new(),
         }
@@ -258,10 +263,10 @@ pub fn start_mesh_tasks(
     } = voxel_engine.as_mut();
 
     let scanner_g = scanners.single();
-    let scan_pos = ((scanner_g.translation() - Vec3::splat(16.0)) * (1.0 / 32.0)).as_ivec3();
+    let scan_position: ChunkPosition = Position(scanner_g.translation().as_ivec3()).into();
     load_mesh_queue.sort_by(|a, b| {
-        a.0.distance_squared(scan_pos)
-            .cmp(&b.0.distance_squared(scan_pos))
+        a.0.distance_squared(scan_position.0)
+            .cmp(&b.0.distance_squared(scan_position.0))
     });
     let tasks_left = (MAX_MESH_TASKS as i32 - mesh_tasks.len() as i32)
         .min(load_mesh_queue.len() as i32)

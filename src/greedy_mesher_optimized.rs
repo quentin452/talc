@@ -208,7 +208,14 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
                 let quads_from_axis = greedy_mesh_binary_plane(plane, lod.size() as u32);
 
                 for q in quads_from_axis {
-                    q.append_vertices(&mut vertices, facedir, axis_pos, &Lod::L16, ao, block_type);
+                    q.append_vertices(
+                        &mut vertices,
+                        facedir,
+                        axis_pos,
+                        &Lod::default(),
+                        ao,
+                        block_type,
+                    );
                 }
             }
         }

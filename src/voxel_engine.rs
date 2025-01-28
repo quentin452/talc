@@ -17,9 +17,8 @@ use crate::{
     chunk::ChunkData,
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
-    constants::CHUNK_SIZE_I32,
     lod::Lod,
-    rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial},
+    rendering::{GlobalChunkMaterial, ATTRIBUTE_VOXEL},
     scanner::Scanner,
     utils::{get_edging_chunk, vec3_to_index},
     voxel::BlockType,
@@ -279,7 +278,6 @@ pub fn start_mesh_tasks(
     }
 }
 
-// start
 pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
     let VoxelEngine {
         world_data,
@@ -296,12 +294,7 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
         let mut adj_chunk_set = HashSet::new();
         for ChunkModification(local_pos, block_type) in mods {
             let i = vec3_to_index(local_pos, 32);
-            if new_chunk_data.voxels.len() == 1 {
-                new_chunk_data.voxels = (0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32).map(|_| {
-                    new_chunk_data.voxels[0]
-                }).collect();
-            }
-            new_chunk_data.voxels[i] = block_type;
+            new_chunk_data.set_block(i, block_type);
             if let Some(edge_chunk) = get_edging_chunk(local_pos) {
                 adj_chunk_set.insert(edge_chunk);
             }

@@ -6,31 +6,59 @@ use crate::{
     voxel::BlockType,
 };
 
-#[derive(Clone)]
+pub const CHUNK_SIZE: usize = 32;
+pub const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
+pub const CHUNK_SIZE_P: usize = CHUNK_SIZE + 2;
+pub const CHUNK_SIZE_P2: usize = CHUNK_SIZE_P * CHUNK_SIZE_P;
+pub const CHUNK_SIZE_P3: usize = CHUNK_SIZE_P * CHUNK_SIZE_P * CHUNK_SIZE_P;
+pub const CHUNK_SIZE2: usize = CHUNK_SIZE * CHUNK_SIZE;
+pub const CHUNK_SIZE2_I32: i32 = CHUNK_SIZE2 as i32;
+pub const CHUNK_SIZE3: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+pub const CHUNK_SIZE3_I32: i32 = (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as i32;
+
+#[derive(Clone, Debug)]
+enum Voxels {
+    Heterogeneous(Box<[BlockType]>),
+    Homogeneous(BlockType)
+}
+
+#[derive(Clone, Debug)]
 pub struct ChunkData {
-    pub voxels: Box<[BlockType]>,
+    voxels: Voxels,
 }
 
 impl ChunkData {
     #[inline]
     #[must_use]
-    pub fn get_block(&self, index: usize) -> BlockType {
-        if self.voxels.len() == 1 {
-            self.voxels[0]
-        } else {
-            self.voxels[index]
+    pub const fn get_block(&self, index: usize) -> BlockType {
+        match &self.voxels {
+            Voxels::Homogeneous(block_type) => *block_type,
+            Voxels::Heterogeneous(voxels) => voxels[index]
         }
     }
 
-    // returns the block type if all voxels are the same
+    pub fn set_block(&mut self, index: usize, block_type: BlockType) {
+        match &mut self.voxels {
+            Voxels::Homogeneous(old_block_type) => {
+                let mut new_voxels: Box<[BlockType]> = (0..CHUNK_SIZE3).map(|_| *old_block_type).collect();
+                new_voxels[index] = block_type;
+                self.voxels = Voxels::Heterogeneous(new_voxels);
+            },
+            Voxels::Heterogeneous(voxels) => {
+                voxels[index] = block_type;
+
+                let homogeneous = voxels.iter().all(|block| *block == block_type);
+                if homogeneous {
+                    self.voxels = Voxels::Homogeneous(block_type);
+                }
+            }
+        }
+    }
+
     #[inline]
     #[must_use]
-    pub fn get_block_if_filled(&self) -> Option<&BlockType> {
-        if self.voxels.len() == 1 {
-            Some(&self.voxels[0])
-        } else {
-            None
-        }
+    pub const fn is_homogenous(&self) -> bool {
+        matches!(self.voxels, Voxels::Homogeneous(_))
     }
 
     /// shape our voxel data based on the `chunk_pos`
@@ -39,19 +67,20 @@ impl ChunkData {
         // hardcoded extremity check
         if chunk_pos.y * 32 + 32 > 21 + 32 {
             return Self {
-                voxels: [BlockType::Air].into(),
+                voxels: Voxels::Homogeneous(BlockType::Air),
             };
         }
         // hardcoded extremity check
         if chunk_pos.y * 32 < -21 - 32 {
             return Self {
-                voxels: [BlockType::Grass].into(),
+                voxels: Voxels::Homogeneous(BlockType::Grass),
             };
         }
+
         let mut voxels = vec![];
         let mut fast_noise = FastNoise::new();
         fast_noise.set_frequency(0.0254);
-        for i in 0..32 * 32 * 32 {
+        for i in 0..CHUNK_SIZE3_I32 {
             let voxel_pos = (chunk_pos * 32) + index_to_ivec3(i);
             let scale = 1.0;
             fast_noise.set_frequency(0.0254);
@@ -76,6 +105,15 @@ impl ChunkData {
             voxels.push(block_type);
         }
 
-        Self { voxels: voxels.as_slice().into() }
+        if let Some(first) = voxels.first() {
+            let homogeneous = voxels.iter().all(|block_type| block_type == first);
+            if homogeneous {
+                return Self {
+                    voxels: Voxels::Homogeneous(*first)
+                }
+            }
+        }
+
+        Self { voxels: Voxels::Heterogeneous(voxels.as_slice().into()) }
     }
 }

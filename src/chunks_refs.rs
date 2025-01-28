@@ -37,26 +37,17 @@ impl ChunksRefs {
         });
         Some(Self { adjacent_chunks })
     }
-    // returns if all the voxels are the same
-    // this is an incredibly fast approximation (1 sample per chunk) all = voxels[0]
-    // so may be inacurate, but the odds are incredibly low
+
     #[must_use]
     pub fn is_all_voxels_same(&self) -> bool {
-        let first_block = self.adjacent_chunks[0].get_block_if_filled();
-        let Some(block) = first_block else {
+        let block_type = if self.adjacent_chunks[0].is_homogenous() {
+            self.adjacent_chunks[0].get_block(0)
+        } else {
             return false;
         };
-        for chunk in &self.adjacent_chunks[1..] {
-            let option = chunk.get_block_if_filled();
-            if let Some(v) = option {
-                if block != v {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-        true
+        self.adjacent_chunks.iter().all(|chunk| {
+            chunk.is_homogenous() && chunk.get_block(0) == block_type
+        })
     }
 
     /// Only used for test suite.
@@ -83,6 +74,7 @@ impl ChunksRefs {
     /// helper function to get block data that may exceed the bounds of the middle chunk
     /// input position is local pos to middle chunk
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn get_block(&self, pos: IVec3) -> BlockType {
         let x = (pos.x + 32) as u32;
         let y = (pos.y + 32) as u32;
@@ -100,6 +92,7 @@ impl ChunksRefs {
     /// helper function to get voxels
     /// panics if the local pos is outside the middle chunk
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn get_block_no_neighbour(&self, pos: IVec3) -> BlockType {
         let chunk_data = &self.adjacent_chunks[13];
         let i = vec3_to_index(pos, 32);

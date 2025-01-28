@@ -20,6 +20,14 @@ tinyvec = "1.6.0"
 [dev-dependencies]
 criterion = {version="0.5.1", features = ["html_reports"]}
 
+# Enable max optimizations for dependencies, but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable optimization in debug mode
+[profile.dev]
+opt-level = 3
+
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }

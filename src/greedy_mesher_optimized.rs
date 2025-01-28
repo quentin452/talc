@@ -3,12 +3,7 @@ use std::collections::VecDeque;
 use bevy::{math::ivec3, prelude::*, utils::HashMap};
 
 use crate::{
-    chunk_mesh::ChunkMesh,
-    chunks_refs::ChunksRefs,
-    constants::{ADJACENT_AO_DIRS, CHUNK_SIZE, CHUNK_SIZE_P},
-    face_direction::FaceDir,
-    lod::Lod,
-    utils::{generate_indices, make_vertex_u32, vec3_to_index},
+    chunk::{CHUNK_SIZE, CHUNK_SIZE3, CHUNK_SIZE_P}, chunk_mesh::ChunkMesh, chunks_refs::ChunksRefs, constants::ADJACENT_AO_DIRS, face_direction::FaceDir, lod::Lod, utils::{generate_indices, make_vertex_u32, vec3_to_index}
 };
 
 #[must_use] pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
@@ -46,15 +41,22 @@ use crate::{
 
     // inner chunk voxels.
     let chunk = &*chunks_refs.adjacent_chunks[vec3_to_index(IVec3::new(1, 1, 1), 3)];
-    assert!(chunk.voxels.len() == CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE || chunk.voxels.len() == 1);
-    for z in 0..CHUNK_SIZE {
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                let i = match chunk.voxels.len() {
-                    1 => 0,
-                    _ => (z * CHUNK_SIZE + y) * CHUNK_SIZE + x,
-                };
-                add_voxel_to_axis_cols(chunk.voxels[i], x + 1, y + 1, z + 1, &mut axis_cols);
+    
+    {
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        for i in 0..CHUNK_SIZE3 {
+            add_voxel_to_axis_cols(chunk.get_block(i), x + 1, y + 1, z + 1, &mut axis_cols);
+
+            x += 1;
+            if x == CHUNK_SIZE {
+                y += 1;
+                x = 0;
+                if y == CHUNK_SIZE {
+                    z += 1;
+                    y = 0;
+                }
             }
         }
     }
@@ -108,8 +110,7 @@ use crate::{
     // note(leddoo): don't ask me how this isn't a massive blottleneck.
     //  might become an issue in the future, when there are more block types.
     //  consider using a single hashmap with key (axis, block_hash, y).
-    let mut data: [HashMap<u32, HashMap<u32, [u32; 32]>>; 6];
-    data = [
+    let mut data: [HashMap<u32, HashMap<u32, [u32; 32]>>; 6] = [
         HashMap::new(),
         HashMap::new(),
         HashMap::new(),

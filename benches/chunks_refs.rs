@@ -1,10 +1,7 @@
 use bevy::math::{IVec3, ivec3};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use talc::{
-    chunks_refs::ChunksRefs,
-    constants::{CHUNK_SIZE, CHUNK_SIZE_I32, CHUNK_SIZE_P},
-    utils::vec3_to_index,
-    voxel::BlockType,
+    chunk::{CHUNK_SIZE, CHUNK_SIZE3_I32, CHUNK_SIZE_P}, chunks_refs::ChunksRefs, utils::vec3_to_index, voxel::BlockType
 };
 
 fn iter_chunkrefs_padding(chunks_refs: &ChunksRefs) {
@@ -58,7 +55,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut d = vec![];
-                for _ in 0..CHUNK_SIZE_I32 * CHUNK_SIZE_I32 * CHUNK_SIZE_I32 {
+                for _ in 0..CHUNK_SIZE3_I32 {
                     d.push(BlockType::Air);
                 }
                 d

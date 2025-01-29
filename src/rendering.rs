@@ -31,9 +31,6 @@ struct ChunkMaterialComponent;
 #[derive(Component, Clone)]
 struct ChunkMaterialWireframeComponent;
 
-#[derive(Component, Clone)]
-pub struct MeshComponent(pub Handle<Mesh>);
-
 // This system toggles between wireframe rendering mode and solid rendering mode when the T key is pressed.
 #[allow(clippy::needless_pass_by_value)]
 fn apply_chunk_material(

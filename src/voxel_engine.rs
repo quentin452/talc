@@ -12,9 +12,9 @@ use bevy::{
     utils::{HashMap, HashSet},
 };
 
-use crate::chunk::{CHUNK_SIZE_F32, CHUNK_SIZE_I32, Chunk, ChunkData};
+use crate::chunk::{Chunk, ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32};
 use crate::position::{ChunkPosition, FloatingPosition, Position, RelativePosition};
-use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial, MeshComponent};
+use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial};
 use crate::{
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
@@ -279,8 +279,8 @@ pub struct WaitingToLoadMeshTag;
 
 pub fn promote_dirty_meshes(
     mut commands: Commands,
-    children: &Query<(Entity, &MeshComponent, &Parent), With<WaitingToLoadMeshTag>>,
-    mut parents: Query<&mut MeshComponent, Without<WaitingToLoadMeshTag>>,
+    children: &Query<(Entity, &Mesh3d, &Parent), With<WaitingToLoadMeshTag>>,
+    mut parents: Query<&mut Mesh3d, Without<WaitingToLoadMeshTag>>,
     asset_server: &Res<AssetServer>,
 ) {
     for (entity, handle, parent) in children.iter() {
@@ -347,8 +347,6 @@ pub fn join_mesh(
             commands.entity(*entity).despawn();
         }
 
-        const CHUNK_INITIAL_Y_OFFSET: f32 = -64.;
-
         // spawn chunk entity
         let chunk_entity = commands
             .spawn((
@@ -356,7 +354,7 @@ pub fn join_mesh(
                 SmoothTransformTo::new(
                     &timer,
                     FloatingPosition::new(0., -CHUNK_INITIAL_Y_OFFSET, 0.),
-                    22.,
+                    CHUNK_FLOAT_UP_BLOCKS_PER_SECOND,
                 ),
                 Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
                 Mesh3d(mesh_handle),

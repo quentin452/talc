@@ -22,6 +22,10 @@ pub const CHUNK_SIZE2_I32: i32 = CHUNK_SIZE2 as i32;
 pub const CHUNK_SIZE3: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 pub const CHUNK_SIZE3_I32: i32 = (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as i32;
 
+/// Chunks will "float up" this distance after generating.
+pub const CHUNK_INITIAL_Y_OFFSET: f32 = -64.;
+pub const CHUNK_FLOAT_UP_BLOCKS_PER_SECOND: f32 = 32.;
+
 /// The index of a voxel within a chunk.
 /// Each chunk contains `chunk::CHUNK_SIZE3` voxels.
 #[derive(Debug, Hash, Clone, Copy)]

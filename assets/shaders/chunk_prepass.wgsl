@@ -65,13 +65,7 @@ fn vertex(vertex: Vertex) -> MyVertexOutput {
     let ao = u32((vertex.vert_data & (3u << 18u)) >> 18u);
     let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
 
-
-    // let ambient_lerp = ambient_lerps[ao];
-    // out.ambient = ambient_lerp;
-    // out.blend_color = vec3<f32>(1.0,0.0,0.0);
-
     let normal = normals[normal_index];
-    // out.world_normal = mesh_normal_local_to_world(normal, vertex.instance_index);
     out.world_normal = mesh_normal_local_to_world(normal, vertex.instance_index);
 
     let local_position = vec4<f32>(x,y,z, 1.0);
@@ -82,8 +76,6 @@ fn vertex(vertex: Vertex) -> MyVertexOutput {
 
     let world_position = model* local_position;
     out.position = mesh_functions::mesh_position_local_to_clip(model, local_position);
-
-    // out.world_position = mesh_functions::mesh_position_local_to_world(model, local_position);
 
     return out;
 }

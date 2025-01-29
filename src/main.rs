@@ -104,16 +104,9 @@ pub fn setup(
         talc::sun::Sun,
         DirectionalLight {
             illuminance: 10000.0,
-            shadows_enabled: true,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, PI / 2., -PI / 4.)),
-        CascadeShadowConfigBuilder {
-            num_cascades: 1,
-            maximum_distance: 32.0 * 20.0,
-            ..default()
-        }
-        .build(),
     ));
 
     commands

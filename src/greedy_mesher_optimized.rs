@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    chunk::{CHUNK_SIZE, CHUNK_SIZE3, CHUNK_SIZE_P},
+    chunk::{CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE3},
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     constants::ADJACENT_AO_DIRS,

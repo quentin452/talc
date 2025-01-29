@@ -1,4 +1,4 @@
-use bevy::math::{ivec2, IVec2};
+use bevy::math::{IVec2, ivec2};
 
 use crate::position::ChunkPosition;
 

@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use talc::{
-    chunk::{VoxelIndex, CHUNK_SIZE, CHUNK_SIZE3_I32, CHUNK_SIZE_I32, CHUNK_SIZE_P},
+    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, CHUNK_SIZE_P, CHUNK_SIZE3_I32, VoxelIndex},
     chunks_refs::ChunksRefs,
     position::RelativePosition,
     voxel::BlockType,

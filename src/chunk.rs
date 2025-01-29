@@ -1,9 +1,13 @@
+use bevy::ecs::component::Component;
 use bracket_noise::prelude::*;
 
 use crate::{
     position::{ChunkPosition, Position, RelativePosition},
     voxel::BlockType,
 };
+
+#[derive(Component)]
+pub struct Chunk;
 
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
@@ -176,7 +180,8 @@ impl ChunkData {
             }
 
             block_type
-        }).into();
+        })
+        .into();
 
         if let Some(first) = voxels.first() {
             let homogeneous = voxels.iter().all(|block_type| block_type == first);

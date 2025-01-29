@@ -9,6 +9,7 @@ pub mod position;
 pub mod quad;
 pub mod rendering;
 pub mod scanner;
+pub mod smooth_transform;
 pub mod sun;
 pub mod utils;
 pub mod voxel;

@@ -8,18 +8,19 @@ use bevy::{
         mesh::Indices, primitives::Aabb, render_asset::RenderAssetUsages,
         render_resource::PrimitiveTopology,
     },
-    tasks::{block_on, AsyncComputeTaskPool, Task},
+    tasks::{AsyncComputeTaskPool, Task, block_on},
     utils::{HashMap, HashSet},
 };
 
+use crate::chunk::{CHUNK_SIZE_F32, CHUNK_SIZE_I32, Chunk, ChunkData};
+use crate::position::{ChunkPosition, FloatingPosition, Position, RelativePosition};
+use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial, MeshComponent};
 use crate::{
-    chunk::{ChunkData, CHUNK_SIZE_F32, CHUNK_SIZE_I32},
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     lod::Lod,
-    position::{ChunkPosition, FloatingPosition, Position, RelativePosition},
-    rendering::{GlobalChunkMaterial, MeshComponent, ATTRIBUTE_VOXEL},
     scanner::Scanner,
+    smooth_transform::{SmoothTransformTo, smooth_transform},
     utils::get_edging_chunk,
     voxel::BlockType,
 };
@@ -36,7 +37,7 @@ impl Plugin for VoxelEnginePlugin {
         // app.add_systems(Update, (start_data_tasks, start_mesh_tasks));
         app.add_systems(PostUpdate, (start_data_tasks, start_mesh_tasks));
         // app.add_systems(PostUpdate, (join_data, join_mesh));
-        app.add_systems(Update, start_modifications);
+        app.add_systems(Update, (start_modifications, smooth_transform));
         app.add_systems(
             // PostUpdate,
             Update,
@@ -297,7 +298,7 @@ pub fn promote_dirty_meshes(
                     info!("loading cool");
                 }
                 LoadState::NotLoaded => (),
-                LoadState::Failed(error) => eprintln!("Could not load asset! Error: {error}")
+                LoadState::Failed(error) => eprintln!("Could not load asset! Error: {error}"),
             }
         }
     }
@@ -310,6 +311,7 @@ pub fn join_mesh(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     global_chunk_material: Res<GlobalChunkMaterial>,
+    timer: Res<Time>,
 ) {
     let VoxelEngine {
         mesh_tasks,
@@ -345,15 +347,25 @@ pub fn join_mesh(
             commands.entity(*entity).despawn();
         }
 
+        const CHUNK_INITIAL_Y_OFFSET: f32 = -64.;
+
         // spawn chunk entity
         let chunk_entity = commands
             .spawn((
+                Chunk,
+                SmoothTransformTo::new(
+                    &timer,
+                    FloatingPosition::new(0., -CHUNK_INITIAL_Y_OFFSET, 0.),
+                    22.,
+                ),
                 Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
                 Mesh3d(mesh_handle),
                 MeshMaterial3d(global_chunk_material.0.clone()),
                 Transform::from_translation(
-                    FloatingPosition::from(*chunk_position).0,
-                )
+                    (FloatingPosition::from(*chunk_position)
+                        + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.))
+                    .0,
+                ),
             ))
             .id();
         chunk_entities.insert(*chunk_position, chunk_entity);

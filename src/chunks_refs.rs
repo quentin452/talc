@@ -5,7 +5,7 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 use crate::{
-    chunk::{ChunkData, VoxelIndex, CHUNK_SIZE, CHUNK_SIZE_I32},
+    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
     position::{ChunkPosition, RelativePosition},
     quad::Direction,
     utils::index_to_ivec3_bounds,

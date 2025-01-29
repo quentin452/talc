@@ -1,11 +1,12 @@
-use bevy::{
-    pbr::{MaterialPipeline, MaterialPipelineKey}, prelude::*, render::render_resource::AsBindGroup
-};
-use bevy::render::render_resource::{
-    PolygonMode, RenderPipelineDescriptor, ShaderRef,
-    SpecializedMeshPipelineError, VertexFormat,
-};
 use bevy::render::mesh::{MeshVertexAttribute, MeshVertexBufferLayoutRef};
+use bevy::render::render_resource::{
+    PolygonMode, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError, VertexFormat,
+};
+use bevy::{
+    pbr::{MaterialPipeline, MaterialPipelineKey},
+    prelude::*,
+    render::render_resource::AsBindGroup,
+};
 
 #[derive(Resource)]
 pub enum ChunkMaterialWireframeMode {
@@ -109,7 +110,9 @@ impl Material for ChunkMaterial {
         layout: &MeshVertexBufferLayoutRef,
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.0.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
+        let vertex_layout = layout
+            .0
+            .get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
     }
@@ -151,7 +154,9 @@ impl Material for ChunkMaterialWireframe {
         layout: &MeshVertexBufferLayoutRef,
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.0.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
+        let vertex_layout = layout
+            .0
+            .get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
         descriptor.primitive.polygon_mode = PolygonMode::Line;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())

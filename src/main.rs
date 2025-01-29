@@ -1,14 +1,14 @@
 use std::f32::consts::PI;
 
 use bevy::render::{
-    settings::{RenderCreation, WgpuFeatures, WgpuSettings},
     RenderPlugin,
+    settings::{RenderCreation, WgpuFeatures, WgpuSettings},
 };
 use bevy::{core::TaskPoolThreadAssignmentPolicy, pbr::CascadeShadowConfigBuilder, prelude::*};
 use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
 
 use talc::{
-    chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32},
+    chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
     position::FloatingPosition,
     rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
@@ -107,29 +107,20 @@ pub fn setup(
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::ZYX,
-            0.0,
-            PI / 2.,
-            -PI / 4.,
-        )),
+        Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, PI / 2., -PI / 4.)),
         CascadeShadowConfigBuilder {
             num_cascades: 1,
             maximum_distance: 32.0 * 20.0,
             ..default()
-        }.build()
+        }
+        .build(),
     ));
-    // uncomment for scanner at origin position
-    // commands.spawn((
-    //     TransformBundle::from_transform(Transform::from_translation(Vec3::ZERO)),
-    // Scanner::new(10),
-    // ));
 
     commands
         .spawn((
             Scanner::new(12),
             Transform::from_xyz(0.0, 2.0, 0.5),
-            Camera3d::default()
+            Camera3d::default(),
         ))
         .insert(FlyCam);
 

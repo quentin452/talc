@@ -25,10 +25,10 @@ impl Plugin for RenderingPlugin {
 }
 
 #[derive(Component, Clone)]
-struct ChunkMaterialComponent(Handle<ChunkMaterial>);
+struct ChunkMaterialComponent;
 
 #[derive(Component, Clone)]
-struct ChunkMaterialWireframeComponent(Handle<ChunkMaterialWireframe>);
+struct ChunkMaterialWireframeComponent;
 
 #[derive(Component, Clone)]
 pub struct MeshComponent(pub Handle<Mesh>);
@@ -41,8 +41,6 @@ fn apply_chunk_material(
     input: Res<ButtonInput<KeyCode>>,
     mut mode: ResMut<ChunkMaterialWireframeMode>,
     mut commands: Commands,
-    chunk_mat: Res<GlobalChunkMaterial>,
-    chunk_mat_wireframe: Res<GlobalChunkWireframeMaterial>,
 ) {
     use ChunkMaterialWireframeMode as F;
     if !input.just_pressed(KeyCode::KeyT) {
@@ -57,7 +55,7 @@ fn apply_chunk_material(
             for entity in no_wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(ChunkMaterialWireframeComponent(chunk_mat_wireframe.0.clone()))
+                    .insert(ChunkMaterialWireframeComponent)
                     .remove::<ChunkMaterialComponent>();
             }
         }
@@ -65,7 +63,7 @@ fn apply_chunk_material(
             for entity in wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(ChunkMaterialComponent(chunk_mat.0.clone()))
+                    .insert(ChunkMaterialComponent)
                     .remove::<ChunkMaterialWireframeComponent>();
             }
         }

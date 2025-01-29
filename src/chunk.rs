@@ -137,15 +137,14 @@ impl ChunkData {
             };
         }
 
-        let mut voxels = vec![];
+        let world_position = Position::from(chunk_position);
         let mut fast_noise = FastNoise::new();
         fast_noise.set_frequency(0.0254);
-
-        let world_position = Position::from(chunk_position);
         let mut x = 0;
         let mut y = 0;
         let mut z = 0;
-        for _ in 0..CHUNK_SIZE3 {
+
+        let voxels: Box<[BlockType; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
             let wy = (y + world_position.y()) as f32;
             let wz = (z + world_position.z()) as f32;
@@ -165,7 +164,6 @@ impl ChunkData {
             } else {
                 BlockType::Grass
             };
-            voxels.push(block_type);
 
             x += 1;
             if x == CHUNK_SIZE_I32 {
@@ -176,7 +174,9 @@ impl ChunkData {
                     y = 0;
                 }
             }
-        }
+
+            block_type
+        }).into();
 
         if let Some(first) = voxels.first() {
             let homogeneous = voxels.iter().all(|block_type| block_type == first);
@@ -188,7 +188,7 @@ impl ChunkData {
         }
 
         Self {
-            voxels: Voxels::Heterogeneous(voxels.as_slice().into()),
+            voxels: Voxels::Heterogeneous(voxels),
         }
     }
 }

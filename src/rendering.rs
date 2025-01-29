@@ -1,14 +1,11 @@
 use bevy::{
-    pbr::{MaterialPipeline, MaterialPipelineKey},
-    prelude::*,
-    render::{
-        mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
-        render_resource::{
-            AsBindGroup, PolygonMode, RenderPipelineDescriptor, ShaderRef,
-            SpecializedMeshPipelineError, VertexFormat,
-        },
-    },
+    pbr::{MaterialPipeline, MaterialPipelineKey}, prelude::*, render::render_resource::AsBindGroup
 };
+use bevy::render::render_resource::{
+    PolygonMode, RenderPipelineDescriptor, ShaderRef,
+    SpecializedMeshPipelineError, VertexFormat,
+};
+use bevy::render::mesh::{MeshVertexAttribute, MeshVertexBufferLayoutRef};
 
 #[derive(Resource)]
 pub enum ChunkMaterialWireframeMode {
@@ -27,10 +24,20 @@ impl Plugin for RenderingPlugin {
     }
 }
 
+#[derive(Component, Clone)]
+struct ChunkMaterialComponent(Handle<ChunkMaterial>);
+
+#[derive(Component, Clone)]
+struct ChunkMaterialWireframeComponent(Handle<ChunkMaterialWireframe>);
+
+#[derive(Component, Clone)]
+pub struct MeshComponent(pub Handle<Mesh>);
+
+// This system toggles between wireframe rendering mode and solid rendering mode when the T key is pressed.
 #[allow(clippy::needless_pass_by_value)]
 fn apply_chunk_material(
-    no_wireframe: Query<Entity, With<Handle<ChunkMaterial>>>,
-    wireframe: Query<Entity, With<Handle<ChunkMaterialWireframe>>>,
+    no_wireframe: Query<Entity, With<ChunkMaterialComponent>>,
+    wireframe: Query<Entity, With<ChunkMaterialWireframeComponent>>,
     input: Res<ButtonInput<KeyCode>>,
     mut mode: ResMut<ChunkMaterialWireframeMode>,
     mut commands: Commands,
@@ -50,16 +57,16 @@ fn apply_chunk_material(
             for entity in no_wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(chunk_mat_wireframe.0.clone())
-                    .remove::<Handle<ChunkMaterial>>();
+                    .insert(ChunkMaterialWireframeComponent(chunk_mat_wireframe.0.clone()))
+                    .remove::<ChunkMaterialComponent>();
             }
         }
         F::Off => {
             for entity in wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(chunk_mat.0.clone())
-                    .remove::<Handle<ChunkMaterialWireframe>>();
+                    .insert(ChunkMaterialComponent(chunk_mat.0.clone()))
+                    .remove::<ChunkMaterialWireframeComponent>();
             }
         }
     }
@@ -101,10 +108,10 @@ impl Material for ChunkMaterial {
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayoutRef,
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
+        let vertex_layout = layout.0.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
     }
@@ -143,10 +150,10 @@ impl Material for ChunkMaterialWireframe {
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayoutRef,
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
+        let vertex_layout = layout.0.get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
         descriptor.primitive.polygon_mode = PolygonMode::Line;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())

@@ -5,11 +5,7 @@ use bevy::render::{
     RenderPlugin,
 };
 use bevy::{core::TaskPoolThreadAssignmentPolicy, pbr::CascadeShadowConfigBuilder, prelude::*};
-
 use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
-use bevy_screen_diagnostics::{
-    ScreenDiagnosticsPlugin, ScreenEntityDiagnosticsPlugin, ScreenFrameDiagnosticsPlugin,
-};
 
 use talc::{
     chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32},
@@ -60,11 +56,6 @@ fn main() {
         // camera plugin
         .add_plugins(NoCameraPlayerPlugin)
         .add_plugins(RenderingPlugin)
-        .add_plugins((
-            ScreenDiagnosticsPlugin::default(),
-            ScreenFrameDiagnosticsPlugin,
-            ScreenEntityDiagnosticsPlugin,
-        ))
         .insert_resource(MovementSettings {
             sensitivity: 0.00015, // default: 0.00012
             speed: 64.0 * 2.0,    // default: 12.0
@@ -88,13 +79,13 @@ pub fn modify_current_terrain(
     let looking_at_position = FloatingPosition(looking_at_position);
     let camera_chunk = looking_at_position.into();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut mods = vec![];
     for _ in 0..CHUNK_SIZE2 {
         let pos = RelativePosition::new(
-            rng.gen_range(0..CHUNK_SIZE_I32),
-            rng.gen_range(0..CHUNK_SIZE_I32),
-            rng.gen_range(0..CHUNK_SIZE_I32),
+            rng.random_range(0..CHUNK_SIZE_I32),
+            rng.random_range(0..CHUNK_SIZE_I32),
+            rng.random_range(0..CHUNK_SIZE_I32),
         );
         mods.push(ChunkModification(pos, BlockType::Air));
     }
@@ -111,26 +102,22 @@ pub fn setup(
     commands.spawn((
         Name::new("Sun"),
         talc::sun::Sun,
-        DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                illuminance: 10000.0,
-                shadows_enabled: true,
-                ..default()
-            },
-            transform: Transform::from_rotation(Quat::from_euler(
-                EulerRot::ZYX,
-                0.0,
-                PI / 2.,
-                -PI / 4.,
-            )),
-            cascade_shadow_config: CascadeShadowConfigBuilder {
-                num_cascades: 1,
-                maximum_distance: 32.0 * 20.0,
-                ..default()
-            }
-            .into(),
+        DirectionalLight {
+            illuminance: 10000.0,
+            shadows_enabled: true,
             ..default()
         },
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::ZYX,
+            0.0,
+            PI / 2.,
+            -PI / 4.,
+        )),
+        CascadeShadowConfigBuilder {
+            num_cascades: 1,
+            maximum_distance: 32.0 * 20.0,
+            ..default()
+        }.build()
     ));
     // uncomment for scanner at origin position
     // commands.spawn((
@@ -141,10 +128,8 @@ pub fn setup(
     commands
         .spawn((
             Scanner::new(12),
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 2.0, 0.5),
-                ..default()
-            },
+            Transform::from_xyz(0.0, 2.0, 0.5),
+            Camera3d::default()
         ))
         .insert(FlyCam);
 

@@ -66,9 +66,9 @@ impl ChunksRefs {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
         let pos = ChunkPosition::new(
-            rng.gen_range(-20..20),
-            rng.gen_range(-5..5),
-            rng.gen_range(-20..20),
+            rng.random_range(-20..20),
+            rng.random_range(-5..5),
+            rng.random_range(-20..20),
         );
 
         let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {

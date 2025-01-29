@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bevy::{
     asset::LoadState,
-    diagnostic::{Diagnostic, DiagnosticPath, Diagnostics, RegisterDiagnostic},
+    diagnostic::{Diagnostic, DiagnosticPath, RegisterDiagnostic},
     prelude::*,
     render::{
         mesh::Indices, primitives::Aabb, render_asset::RenderAssetUsages,
@@ -11,7 +11,6 @@ use bevy::{
     tasks::{block_on, AsyncComputeTaskPool, Task},
     utils::{HashMap, HashSet},
 };
-use bevy_screen_diagnostics::{Aggregate, ScreenDiagnostics};
 
 use crate::{
     chunk::{ChunkData, CHUNK_SIZE_F32, CHUNK_SIZE_I32},
@@ -19,7 +18,7 @@ use crate::{
     chunks_refs::ChunksRefs,
     lod::Lod,
     position::{ChunkPosition, FloatingPosition, Position, RelativePosition},
-    rendering::{GlobalChunkMaterial, ATTRIBUTE_VOXEL},
+    rendering::{GlobalChunkMaterial, MeshComponent, ATTRIBUTE_VOXEL},
     scanner::Scanner,
     utils::get_edging_chunk,
     voxel::BlockType,
@@ -43,7 +42,6 @@ impl Plugin for VoxelEnginePlugin {
             Update,
             ((join_data, join_mesh), (unload_data, unload_mesh)).chain(),
         );
-        app.add_systems(Startup, setup_diagnostics);
         app.register_diagnostic(Diagnostic::new(DIAG_LOAD_MESH_QUEUE));
         app.register_diagnostic(Diagnostic::new(DIAG_UNLOAD_MESH_QUEUE));
         app.register_diagnostic(Diagnostic::new(DIAG_LOAD_DATA_QUEUE));
@@ -51,7 +49,6 @@ impl Plugin for VoxelEnginePlugin {
         app.register_diagnostic(Diagnostic::new(DIAG_VERTEX_COUNT));
         app.register_diagnostic(Diagnostic::new(DIAG_MESH_TASKS));
         app.register_diagnostic(Diagnostic::new(DIAG_DATA_TASKS));
-        app.add_systems(Update, diagnostics_count);
     }
 }
 
@@ -80,64 +77,6 @@ const DIAG_UNLOAD_MESH_QUEUE: DiagnosticPath = DiagnosticPath::const_new("unload
 const DIAG_VERTEX_COUNT: DiagnosticPath = DiagnosticPath::const_new("vertex_count");
 const DIAG_MESH_TASKS: DiagnosticPath = DiagnosticPath::const_new("mesh_tasks");
 const DIAG_DATA_TASKS: DiagnosticPath = DiagnosticPath::const_new("data_tasks");
-
-fn setup_diagnostics(mut onscreen: ResMut<ScreenDiagnostics>) {
-    onscreen
-        .add("load_data_queue".to_string(), DIAG_LOAD_DATA_QUEUE)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>4.0}"));
-    onscreen
-        .add("unload_data_queue".to_string(), DIAG_UNLOAD_DATA_QUEUE)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>3.0}"));
-    onscreen
-        .add("load_mesh_queue".to_string(), DIAG_LOAD_MESH_QUEUE)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>4.0}"));
-    onscreen
-        .add("unload_mesh_queue".to_string(), DIAG_UNLOAD_MESH_QUEUE)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>3.0}"));
-    onscreen
-        .add("vertex_count".to_string(), DIAG_VERTEX_COUNT)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>7.0}"));
-    onscreen
-        .add("mesh_tasks".to_string(), DIAG_MESH_TASKS)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>4.0}"));
-    onscreen
-        .add("data_tasks".to_string(), DIAG_DATA_TASKS)
-        .aggregate(Aggregate::Value)
-        .format(|v| format!("{v:0>2.0}"));
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn diagnostics_count(mut diagnostics: Diagnostics, voxel_engine: Res<VoxelEngine>) {
-    diagnostics.add_measurement(&DIAG_LOAD_DATA_QUEUE, || {
-        voxel_engine.load_data_queue.len() as f64
-    });
-    diagnostics.add_measurement(&DIAG_UNLOAD_DATA_QUEUE, || {
-        voxel_engine.unload_data_queue.len() as f64
-    });
-    diagnostics.add_measurement(&DIAG_LOAD_MESH_QUEUE, || {
-        voxel_engine.load_mesh_queue.len() as f64
-    });
-    diagnostics.add_measurement(&DIAG_UNLOAD_MESH_QUEUE, || {
-        voxel_engine.unload_mesh_queue.len() as f64
-    });
-    diagnostics.add_measurement(&DIAG_MESH_TASKS, || voxel_engine.mesh_tasks.len() as f64);
-    diagnostics.add_measurement(&DIAG_DATA_TASKS, || voxel_engine.data_tasks.len() as f64);
-    diagnostics.add_measurement(&DIAG_VERTEX_COUNT, || {
-        f64::from(
-            voxel_engine
-                .vertex_diagnostic
-                .iter()
-                .map(|(_, v)| v)
-                .sum::<i32>(),
-        )
-    });
-}
 
 impl VoxelEngine {
     pub fn unload_all_meshes(&mut self, scanner: &Scanner, scanner_transform: &GlobalTransform) {
@@ -339,25 +278,26 @@ pub struct WaitingToLoadMeshTag;
 
 pub fn promote_dirty_meshes(
     mut commands: Commands,
-    children: &Query<(Entity, &Handle<Mesh>, &Parent), With<WaitingToLoadMeshTag>>,
-    mut parents: Query<&mut Handle<Mesh>, Without<WaitingToLoadMeshTag>>,
+    children: &Query<(Entity, &MeshComponent, &Parent), With<WaitingToLoadMeshTag>>,
+    mut parents: Query<&mut MeshComponent, Without<WaitingToLoadMeshTag>>,
     asset_server: &Res<AssetServer>,
 ) {
     for (entity, handle, parent) in children.iter() {
-        if let Some(state) = asset_server.get_load_state(handle) {
+        if let Some(state) = asset_server.get_load_state(&handle.0) {
             match state {
-                LoadState::Loaded | LoadState::Failed => {
+                LoadState::Loaded => {
                     let Ok(mut parent_handle) = parents.get_mut(parent.get()) else {
                         continue;
                     };
                     info!("updgraded!");
-                    *parent_handle = handle.clone();
+                    parent_handle.0 = handle.0.clone();
                     commands.entity(entity).despawn();
                 }
                 LoadState::Loading => {
                     info!("loading cool");
                 }
                 LoadState::NotLoaded => (),
+                LoadState::Failed(error) => eprintln!("Could not load asset! Error: {error}")
             }
         }
     }
@@ -409,14 +349,11 @@ pub fn join_mesh(
         let chunk_entity = commands
             .spawn((
                 Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
-                MaterialMeshBundle {
-                    transform: Transform::from_translation(
-                        FloatingPosition::from(*chunk_position).0,
-                    ),
-                    mesh: mesh_handle,
-                    material: global_chunk_material.0.clone(),
-                    ..default()
-                },
+                Mesh3d(mesh_handle),
+                MeshMaterial3d(global_chunk_material.0.clone()),
+                Transform::from_translation(
+                    FloatingPosition::from(*chunk_position).0,
+                )
             ))
             .id();
         chunk_entities.insert(*chunk_position, chunk_entity);

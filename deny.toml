@@ -1,0 +1,46 @@
+# Adopted from bevy
+# See <https://github.com/bevyengine/bevy/blob/main/deny.toml>
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+[licenses]
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "0BSD",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "ISC",
+  "Zlib",
+  "CC0-1.0",
+  "OFL-1.1",
+]
+confidence-threshold = 0.8
+exceptions = [
+  { name = "unicode-ident", allow = ["Unicode-DFS-2016"] },
+  # For `bevy_egui`
+  { name = "epaint", allow = ["LicenseRef-UFL-1.0"] },
+]
+
+[bans]
+multiple-versions = "warn"
+# TODO: Change back to "deny"
+# This currently doesn't work with git dependencies (even if the hash is fixed)
+# See <https://github.com/Leafwing-Studios/Emergence/issues/193>
+wildcards = "warn"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# If you add something here please also add a comment explaining why it's necessary :)
+# The key of this field is the repo's root URL
+allow-git = [
+  # bevy_mod_billobard: waiting on PR merge
+  "https://github.com/robtfm/bevy_mod_billboard",
+]

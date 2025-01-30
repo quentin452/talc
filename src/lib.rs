@@ -14,3 +14,4 @@ pub mod sun;
 pub mod utils;
 pub mod voxel;
 pub mod voxel_engine;
+pub mod debug_camera;

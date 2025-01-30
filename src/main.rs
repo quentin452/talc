@@ -6,12 +6,10 @@ use bevy::{app::TaskPoolThreadAssignmentPolicy, core_pipeline::{bloom::Bloom, to
 use bevy::prelude::*;
 
 use talc::{
-    chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
-    position::FloatingPosition,
-    rendering::{
+    chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32}, debug_camera::{FlyCam, MovementSettings, NoCameraPlayerPlugin}, position::FloatingPosition, rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
         RenderingPlugin,
-    },
+    }
 };
 use talc::{
     position::RelativePosition,
@@ -53,6 +51,12 @@ fn main() {
         // camera plugin
         .add_plugins(RenderingPlugin)
         .add_systems(Update, modify_current_terrain)
+        .add_plugins(NoCameraPlayerPlugin)
+        .insert_resource(MovementSettings {
+            sensitivity: 0.00015, // default: 0.00012
+            speed: 64.0 * 2.0,    // default: 12.0
+                                  // speed: 32.0 * 12.0,   // default: 12.0
+        })
         .run();
 }
 
@@ -111,13 +115,14 @@ pub fn setup(
             },
             Atmosphere::EARTH,
             AtmosphereSettings {
-                aerial_view_lut_max_distance: 3.2e5,
-                scene_units_to_m: 1e+4,
+                aerial_view_lut_max_distance: 3.2,
+                scene_units_to_m: 1.,
                 ..Default::default()
             },
-            Tonemapping::AcesFitted,
+            //Tonemapping::AcesFitted,
             Bloom::NATURAL,
-        ));
+        ))
+        .insert(FlyCam);
 
     commands.insert_resource(GlobalChunkMaterial(chunk_materials.add(ChunkMaterial {
         reflectance: 0.5,

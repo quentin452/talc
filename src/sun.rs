@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 pub const DAY_TIME_SEC: f32 = 60.0;
-pub const NIGHT_TIME_SEC: f32 = 1.0;
+pub const NIGHT_TIME_SEC: f32 = 10.0;
 pub const CYCLE_TIME: f32 = DAY_TIME_SEC + NIGHT_TIME_SEC;
 
 /// current time of day
@@ -24,7 +24,7 @@ impl Plugin for SunPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SkyTime(0f32));
         app.insert_resource(CycleTimer(Timer::new(
-            Duration::from_millis(450),
+            Duration::from_millis(50),
             TimerMode::Repeating,
         )));
         app.add_systems(Update, daylight_cycle);
@@ -61,6 +61,6 @@ fn daylight_cycle(
 
     for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));
-        directional.illuminance = percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT;
+        directional.illuminance = percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT * 0.4;
     }
 }

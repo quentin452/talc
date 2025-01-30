@@ -1,11 +1,9 @@
 use std::f32::consts::PI;
 
-use bevy::render::{
-    RenderPlugin,
-    settings::{RenderCreation, WgpuFeatures, WgpuSettings},
-};
-use bevy::{core::TaskPoolThreadAssignmentPolicy, pbr::CascadeShadowConfigBuilder, prelude::*};
-use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
+use bevy::{app::TaskPoolThreadAssignmentPolicy, core_pipeline::{bloom::Bloom, tonemapping::Tonemapping}, pbr::{Atmosphere, AtmosphereSettings}, render::{
+    settings::{RenderCreation, WgpuFeatures, WgpuSettings}, RenderPlugin
+}};
+use bevy::prelude::*;
 
 use talc::{
     chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
@@ -23,7 +21,6 @@ use talc::{
     voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin},
 };
 
-use bevy_flycam::prelude::*;
 use rand::Rng;
 
 fn main() {
@@ -43,24 +40,18 @@ fn main() {
                         min_threads: 1,
                         max_threads: 8,
                         percent: 0.75,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
                     },
                     ..default()
                 },
             }),))
-        .add_plugins(WorldInspectorPlugin::new())
-        .add_plugins(AssetInspectorPlugin::<ChunkMaterial>::default())
         .add_plugins(VoxelEnginePlugin)
         .add_plugins(SunPlugin)
         .add_plugins(ScannerPlugin)
         .add_systems(Startup, setup)
         // camera plugin
-        .add_plugins(NoCameraPlayerPlugin)
         .add_plugins(RenderingPlugin)
-        .insert_resource(MovementSettings {
-            sensitivity: 0.00015, // default: 0.00012
-            speed: 64.0 * 2.0,    // default: 12.0
-                                  // speed: 32.0 * 12.0,   // default: 12.0
-        })
         .add_systems(Update, modify_current_terrain)
         .run();
 }
@@ -103,7 +94,7 @@ pub fn setup(
         Name::new("Sun"),
         talc::sun::Sun,
         DirectionalLight {
-            illuminance: 10000.0,
+            illuminance: light_consts::lux::RAW_SUNLIGHT,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, PI / 2., -PI / 4.)),
@@ -114,8 +105,19 @@ pub fn setup(
             Scanner::new(12),
             Transform::from_xyz(0.0, 2.0, 0.5),
             Camera3d::default(),
-        ))
-        .insert(FlyCam);
+            Camera {
+                hdr: true,
+                ..default()
+            },
+            Atmosphere::EARTH,
+            AtmosphereSettings {
+                aerial_view_lut_max_distance: 3.2e5,
+                scene_units_to_m: 1e+4,
+                ..Default::default()
+            },
+            Tonemapping::AcesFitted,
+            Bloom::NATURAL,
+        ));
 
     commands.insert_resource(GlobalChunkMaterial(chunk_materials.add(ChunkMaterial {
         reflectance: 0.5,

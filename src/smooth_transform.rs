@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy::{
     ecs::{
-        component::Component, entity::Entity, system::{Commands, Query, Res}
+        component::{require, Component}, entity::Entity, system::{Commands, Query, Res}
     },
     math::Vec3,
     time::Time,

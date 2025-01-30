@@ -131,7 +131,7 @@ fn fragment(input: VertexOutput) -> FragmentOutput {
 
     pbr_input.material.base_color = vec4<f32>(input.blend_color * input.ambient, 1.0);
 
-    pbr_input.material.reflectance = chunk_material.reflectance;
+    pbr_input.material.reflectance = vec3<f32>(chunk_material.reflectance, chunk_material.reflectance, chunk_material.reflectance);
     pbr_input.material.perceptual_roughness = chunk_material.perceptual_roughness;
     pbr_input.material.metallic = chunk_material.metallic;
 

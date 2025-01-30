@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::{math::IVec3, utils::HashMap};
+use bevy::{math::IVec3, platform_support::collections::HashMap};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 

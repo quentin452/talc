@@ -9,7 +9,7 @@ use bevy::{
         render_resource::PrimitiveTopology,
     },
     tasks::{AsyncComputeTaskPool, Task, block_on},
-    utils::{HashMap, HashSet},
+    platform_support::collections::{HashMap, HashSet},
 };
 
 use crate::chunk::{Chunk, ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32};
@@ -103,17 +103,17 @@ impl Default for VoxelEngine {
         );
 
         Self {
-            world_data: HashMap::new(),
+            world_data: HashMap::default(),
             load_data_queue: Vec::new(),
             load_mesh_queue: Vec::new(),
             unload_data_queue: Vec::new(),
             unload_mesh_queue: Vec::new(),
-            data_tasks: HashMap::new(),
+            data_tasks: HashMap::default(),
             mesh_tasks: Vec::new(),
-            chunk_entities: HashMap::new(),
+            chunk_entities: HashMap::default(),
             lod: Lod::default(),
-            vertex_diagnostic: HashMap::new(),
-            chunk_modifications: HashMap::new(),
+            vertex_diagnostic: HashMap::default(),
+            chunk_modifications: HashMap::default(),
         }
     }
 }
@@ -212,7 +212,7 @@ pub fn start_mesh_tasks(
         .min(load_mesh_queue.len() as i32)
         .max(0) as usize;
     for chunk_position in load_mesh_queue.drain(0..tasks_left) {
-        let Some(chunks_refs) = ChunksRefs::try_new(world_data, chunk_position) else {
+        let Some(chunks_refs) = ChunksRefs::try_new(&world_data, chunk_position) else {
             continue;
         };
         let llod = *lod;
@@ -279,7 +279,7 @@ pub struct WaitingToLoadMeshTag;
 
 pub fn promote_dirty_meshes(
     mut commands: Commands,
-    children: &Query<(Entity, &Mesh3d, &Parent), With<WaitingToLoadMeshTag>>,
+    children: &Query<(Entity, &Mesh3d, &ChildOf), With<WaitingToLoadMeshTag>>,
     mut parents: Query<&mut Mesh3d, Without<WaitingToLoadMeshTag>>,
     asset_server: &Res<AssetServer>,
 ) {

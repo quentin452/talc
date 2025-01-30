@@ -7,7 +7,7 @@ but anything above that might induce some frame lag, due to how the load/unload 
 
 use std::collections::VecDeque;
 
-use bevy::{prelude::*, utils::HashSet};
+use bevy::{prelude::*, platform_support::collections::HashSet};
 
 use crate::{
     chunk::CHUNK_SIZE_I32, constants::ADJACENT_CHUNK_DIRECTIONS, position::ChunkPosition,

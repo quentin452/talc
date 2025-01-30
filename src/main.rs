@@ -114,7 +114,6 @@ pub fn setup(
             Scanner::new(12),
             Transform::from_xyz(0.0, 2.0, 0.5),
             Camera3d::default(),
-            bevy_atmosphere::plugin::AtmosphereCamera::default(),
         ))
         .insert(FlyCam);
 

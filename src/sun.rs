@@ -1,11 +1,10 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_atmosphere::prelude::*;
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 
-pub const DAY_TIME_SEC: f32 = 60.0 * 0.5;
-pub const NIGHT_TIME_SEC: f32 = 60.0 * 0.1;
+pub const DAY_TIME_SEC: f32 = 60.0;
+pub const NIGHT_TIME_SEC: f32 = 1.0;
 pub const CYCLE_TIME: f32 = DAY_TIME_SEC + NIGHT_TIME_SEC;
 
 /// current time of day
@@ -35,12 +34,11 @@ impl Plugin for SunPlugin {
             illuminance: 4000.0,
         });
         app.insert_resource(CycleTimer(Timer::new(
-            Duration::from_millis(50),
+            Duration::from_millis(450),
             TimerMode::Repeating,
         )));
         app.add_systems(Update, daylight_cycle);
-        app.add_plugins(AtmospherePlugin);
-        app.insert_resource(AtmosphereModel::default());
+        app.add_plugins(ResourceInspectorPlugin::<SunSettings>::default());
     }
 }
 
@@ -48,9 +46,9 @@ impl Plugin for SunPlugin {
 fn daylight_cycle(
     mut query: Query<(&mut Transform, &mut DirectionalLight), With<Sun>>,
     mut timer: ResMut<SkyTime>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     sun_settings: Res<SunSettings>,
-    mut atmosphere: AtmosphereMut<Nishita>,
     mut cycle_timer: ResMut<CycleTimer>,
 ) {
     cycle_timer.0.tick(time.delta());
@@ -58,8 +56,13 @@ fn daylight_cycle(
     if !cycle_timer.0.just_finished() {
         return;
     }
-    
-    timer.0 += cycle_timer.0.duration().as_secs_f32();
+    let multiplier = if keyboard.pressed(KeyCode::KeyI) {
+        6.0
+    } else {
+        1.0
+    };
+    // timer.0 += time.delta_seconds() * multiplier;
+    timer.0 += cycle_timer.0.duration().as_secs_f32() * multiplier;
     if timer.0 > CYCLE_TIME {
         timer.0 -= CYCLE_TIME;
     }
@@ -67,8 +70,6 @@ fn daylight_cycle(
     let day = (timer.0 / DAY_TIME_SEC).min(1.0);
     let night = ((timer.0 - DAY_TIME_SEC) / NIGHT_TIME_SEC).max(0.0);
     let percent = day.mul_add(std::f32::consts::PI, night * std::f32::consts::PI);
-    
-    atmosphere.sun_position = Vec3::new(timer.0.atan() / 2., percent.sin(), percent.cos());
 
     for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));

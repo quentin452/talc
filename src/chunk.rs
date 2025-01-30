@@ -133,13 +133,13 @@ impl ChunkData {
     #[must_use]
     pub fn generate(chunk_position: ChunkPosition) -> Self {
         // hardcoded extremity check
-        if chunk_position.y() * CHUNK_SIZE_I32 > 21 {
+        if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
                 voxels: Voxels::Homogeneous(BlockType::Air),
             };
         }
         // hardcoded extremity check
-        if chunk_position.y() * CHUNK_SIZE_I32 < -53 {
+        if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
                 voxels: Voxels::Homogeneous(BlockType::Grass),
             };
@@ -154,7 +154,7 @@ impl ChunkData {
 
         let voxels: Box<[BlockType; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
-            let wy = (y + world_position.y()) as f32;
+            let wy = (y + world_position.y()) as f32 - 200.;
             let wz = (z + world_position.z()) as f32;
 
             let scale = 1.0;

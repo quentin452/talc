@@ -113,13 +113,26 @@ pub fn setup(
                 hdr: true,
                 ..default()
             },
-            Atmosphere::EARTH,
+            Atmosphere {
+                bottom_radius: 5_000.0,
+                top_radius: 64_600.0 * 3.,
+                ground_albedo: Vec3::splat(0.3),
+                rayleigh_density_exp_scale: 1.0 / 8_000.0,
+                rayleigh_scattering: Vec3::new(5.802e-5, 13.558e-5, 33.100e-5),
+                mie_density_exp_scale: 1.0 / 1_200.0,
+                mie_scattering: 3.996e-6,
+                mie_absorption: 0.444e-6,
+                mie_asymmetry: 0.8,
+                ozone_layer_altitude: 25_000.0,
+                ozone_layer_width: 30_000.0,
+                ozone_absorption: Vec3::new(0.650e-6, 1.881e-6, 0.085e-6),
+            },
             AtmosphereSettings {
                 aerial_view_lut_max_distance: 3.2,
                 scene_units_to_m: 1.,
                 ..Default::default()
             },
-            //Tonemapping::AcesFitted,
+            //Tonemapping::AgX,
             Bloom::NATURAL,
         ))
         .insert(FlyCam);

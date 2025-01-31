@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use bevy::color::Color;
+use bevy::platform_support::collections::hash_map::Iter;
 use bevy::prelude::*;
 use bevy::platform_support::collections::HashMap;
 use mlua::FromLua;
@@ -33,10 +34,10 @@ pub(super) trait PrototypesBuilder {
     fn build(self) -> Self::Final;
 }
 
-pub trait Prototypes {
+pub trait Prototypes where {
     type T: Prototype;
     fn get(&self, name: &str) -> Option<&'static Self::T>;
-    fn get_from_id(&self, id: usize) -> Option<&'static Self::T>;
+    fn iter(&self) -> Iter<'_, std::boxed::Box<str>, &'static Self::T>;
 }
 
 #[derive(Resource, Clone)]
@@ -48,10 +49,10 @@ impl Prototypes for BlockPrototypes {
     fn get(&self, name: &str) -> Option<&'static BlockPrototype> {
         self.0.get(name).map(|v| &**v)
     }
-    
-    fn get_from_id(&self, id: usize) -> Option<&'static Self::T> {
-        todo!()
-    }    
+
+    fn iter(&self) -> Iter<'_, std::boxed::Box<str>, &'static Self::T> {
+        self.0.iter()
+    }
 }
 
 pub(super) struct BlockPrototypesBuilder(usize, HashMap<Box<str>, &'static BlockPrototype>);

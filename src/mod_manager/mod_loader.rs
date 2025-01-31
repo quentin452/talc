@@ -11,6 +11,8 @@ use bevy::prelude::*;
 use mlua::{FromLua, Lua, Table, Value};
 use serde::Deserialize;
 
+use crate::chunk::set_block_registry;
+
 use super::prototypes::{
     BlockPrototypesBuilder, PrototypesBuilder, RawBlockPrototype,
 };
@@ -162,5 +164,7 @@ fn lua_setup(mut commands: Commands) {
     })
     .expect("Found non-string key in data table.");
 
-    commands.insert_resource(block_prototypes.build());
+    let block_prototypes = block_prototypes.build();
+    set_block_registry(&block_prototypes);
+    commands.insert_resource(block_prototypes);
 }

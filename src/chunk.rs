@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use bevy::prelude::*;
 use bracket_noise::prelude::*;
 
@@ -83,10 +85,42 @@ impl From<RelativePosition> for VoxelIndex {
     }
 }
 
+static BLOCK_REGISTRY: OnceLock<[Option<&'static BlockPrototype>; u8::MAX as usize]> = OnceLock::new();
+type ThinBlockPointer = u16; // Classic rust reimplementing pointers. But &'static BlockPrototype is too fat :(
+
+#[inline]
+#[must_use]
+pub fn access_block_registry(id: ThinBlockPointer) -> Option<&'static BlockPrototype> {
+    *BLOCK_REGISTRY.get()?.get(id as usize)?
+}
+
+/// # Builds the block registry.
+/// 
+/// ## What is a block registry?
+/// Each chunk stores data in a flat array of block prototypes.
+/// A naive implemetation may look like `Box<[&'static BlockPrototype]>`
+/// However the & borrow requires 4 bits.
+/// We can reduce the memory footprint by 4x with `Box<[u16]>`
+/// The block registry maps the u16 "thin pointer" back to `&'static BlockPrototype`.
+/// 
+/// # Panics
+/// If the registry has already been constructed.
+pub fn set_block_registry(block_prototypes: &BlockPrototypes) {
+    assert!(BLOCK_REGISTRY.get().is_none(), "Block registry has already been constructed.");
+
+    BLOCK_REGISTRY.get_or_init(|| {        
+        let mut registry = [None; u8::MAX as usize];
+        for (_, &block) in block_prototypes.iter() {
+            registry[block.id as usize] = Some(block);
+        }
+        registry
+    });
+}
+
 #[derive(Clone, Debug)]
 enum Voxels {
-    Heterogeneous(Box<[&'static BlockPrototype]>),
-    Homogeneous(&'static BlockPrototype),
+    Heterogeneous(Box<[ThinBlockPointer]>),
+    Homogeneous(ThinBlockPointer),
 }
 
 #[derive(Clone, Debug)]
@@ -97,25 +131,25 @@ pub struct ChunkData {
 impl ChunkData {
     #[inline]
     #[must_use]
-    pub const fn get_block(&self, index: VoxelIndex) -> &'static BlockPrototype {
+    pub fn get_block(&self, index: VoxelIndex) -> &'static BlockPrototype {
         match &self.voxels {
-            Voxels::Homogeneous(block_type) => block_type,
-            Voxels::Heterogeneous(voxels) => voxels[index.i()],
-        }
+            Voxels::Homogeneous(block_pointer) => access_block_registry(*block_pointer),
+            Voxels::Heterogeneous(voxels) => access_block_registry(voxels[index.i()]),
+        }.expect("Invalid thin block pointer.")
     }
 
     pub fn set_block(&mut self, index: VoxelIndex, block_type: &'static BlockPrototype) {
         match &mut self.voxels {
             Voxels::Homogeneous(old_block_type) => {
-                let mut new_voxels: Box<[&'static BlockPrototype]> =
+                let mut new_voxels: Box<[ThinBlockPointer]> =
                     (0..CHUNK_SIZE3).map(|_| *old_block_type).collect();
-                new_voxels[index.i()] = block_type;
+                new_voxels[index.i()] = block_type.id;
                 self.voxels = Voxels::Heterogeneous(new_voxels);
             }
             Voxels::Heterogeneous(voxels) => {
-                voxels[index.i()] = block_type;
+                voxels[index.i()] = block_type.id;
 
-                let homogeneous = voxels.iter().all(|block| *block == block_type);
+                let homogeneous = voxels.iter().all(|&block| block == block_type.id);
                 if homogeneous {
                     todo!("woo hoo");
                     //self.voxels = Voxels::Homogeneous(block_type);
@@ -136,13 +170,13 @@ impl ChunkData {
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
-                voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap()),
+                voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap().id),
             };
         }
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
-                voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap()),
+                voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap().id),
             };
         }
 
@@ -153,7 +187,7 @@ impl ChunkData {
         let mut y = 0;
         let mut z = 0;
 
-        let voxels: Box<[&'static BlockPrototype; CHUNK_SIZE3]> = std::array::from_fn(|_| {
+        let voxels: Box<[ThinBlockPointer; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
             let wy = (y + world_position.y()) as f32 - 200.;
             let wz = (z + world_position.z()) as f32;
@@ -184,12 +218,12 @@ impl ChunkData {
                 }
             }
 
-            block_type
+            block_type.id
         })
         .into();
 
-        if let Some(first) = voxels.first() {
-            let homogeneous = voxels.iter().all(|block_type| block_type == first);
+        if let Some(&first) = voxels.first() {
+            let homogeneous = voxels.iter().all(|&block_type| block_type == first);
             if homogeneous {
                 return Self {
                     voxels: Voxels::Homogeneous(first),

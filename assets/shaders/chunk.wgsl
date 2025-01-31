@@ -58,13 +58,6 @@ var<private> normals: array<vec3<f32>,6> = array<vec3<f32>,6> (
 	vec3<f32>(0.0, 0.0, 1.0) // Back
 );
 
-var<private> block_color: array<vec3<f32>,3> = array<vec3<f32>,3> (
-	vec3<f32>(0.0, 0.0, 0.0), // air
-	vec3<f32>(0.0, 1.0, 0.0), // grass
-	vec3<f32>(0.3, 0.4, 0.0), // dirt
-);
-
-
 fn x_positive_bits(bits: u32) -> u32{
     return (1u << bits) - 1u;
 }
@@ -78,7 +71,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     let z = f32(vertex.vert_data >> 12u & x_positive_bits(6u));
     let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
     let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
-    let block_index = vertex.vert_data >> 25u & x_positive_bits(7u);
+    //let block_index = vertex.vert_data >> 25u & x_positive_bits(7u);
 
     let local_position = vec4<f32>(x,y,z, 1.0);
     let world_position = get_world_from_local(vertex.instance_index) * local_position;
@@ -103,7 +96,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     noise = (out.world_position.y) / 30.0;
     
     let fun = (low * noise) + (high * (1.0-noise));
-    out.blend_color = block_color[block_index];
+    out.blend_color = vec3<f32>(0.3, 0.4, 0.0);
     out.instance_index = vertex.instance_index;
     return out;
 }

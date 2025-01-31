@@ -1,15 +1,13 @@
 use std::sync::Arc;
 
 use bevy::{math::IVec3, utils::HashMap};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
 
 use crate::{
     chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
+    mod_manager::prototypes::BlockPrototype,
     position::{ChunkPosition, RelativePosition},
     quad::Direction,
     utils::index_to_ivec3_bounds,
-    voxel::BlockType,
 };
 
 // Pointers to chunk data, repersented as the middle one with all their neighbours in 3x3x3 cube.
@@ -60,31 +58,11 @@ impl ChunksRefs {
             .all(|chunk| chunk.is_homogenous() && chunk.get_block(0.into()) == block_type)
     }
 
-    /// Only used for test suite.
-    #[must_use]
-    pub fn make_dummy_chunk_refs(seed: u64) -> Self {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-
-        let pos = ChunkPosition::new(
-            rng.random_range(-20..20),
-            rng.random_range(-5..5),
-            rng.random_range(-20..20),
-        );
-
-        let adjacent_chunks: [Arc<ChunkData>; 27] = std::array::from_fn(|i| {
-            let offset = index_to_ivec3_bounds(i as i32, 3) + IVec3::NEG_ONE;
-            let chunk_position = pos + ChunkPosition(offset);
-            Arc::clone(&Arc::new(ChunkData::generate(chunk_position)))
-        });
-
-        Self { adjacent_chunks }
-    }
-
     /// helper function to get block data that may exceed the bounds of the middle chunk
     /// input position is local pos to middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block(&self, pos: RelativePosition) -> BlockType {
+    pub fn get_block(&self, pos: RelativePosition) -> &'static BlockPrototype {
         let x = (pos.x() + CHUNK_SIZE_I32) as usize;
         let y = (pos.y() + CHUNK_SIZE_I32) as usize;
         let z = (pos.z() + CHUNK_SIZE_I32) as usize;
@@ -103,7 +81,7 @@ impl ChunksRefs {
     /// panics if the local pos is outside the middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block_no_neighbour(&self, pos: RelativePosition) -> BlockType {
+    pub fn get_block_no_neighbour(&self, pos: RelativePosition) -> &'static BlockPrototype {
         let chunk_data: &Arc<ChunkData> = &self.adjacent_chunks[13];
         chunk_data.get_block(pos.into())
     }
@@ -114,7 +92,12 @@ impl ChunksRefs {
         &self,
         pos: RelativePosition,
         // current back, left, down
-    ) -> (BlockType, BlockType, BlockType, BlockType) {
+    ) -> (
+        &'static BlockPrototype,
+        &'static BlockPrototype,
+        &'static BlockPrototype,
+        &'static BlockPrototype,
+    ) {
         let current = self.get_block(pos);
         let back = self.get_block(pos + RelativePosition::new(0, 0, -1));
         let left = self.get_block(pos + RelativePosition::new(-1, 0, 0));
@@ -124,7 +107,10 @@ impl ChunksRefs {
 
     /// helper function to sample adjacent voxels, von neuman include all facing planes
     #[must_use]
-    pub fn get_von_neumann(&self, pos: RelativePosition) -> Option<Vec<(Direction, BlockType)>> {
+    pub fn get_von_neumann(
+        &self,
+        pos: RelativePosition,
+    ) -> Option<Vec<(Direction, &'static BlockPrototype)>> {
         Some(vec![
             (
                 Direction::Back,
@@ -162,7 +148,11 @@ impl ChunksRefs {
     }
 
     #[must_use]
-    pub fn get_2(&self, pos: RelativePosition, offset: RelativePosition) -> (BlockType, BlockType) {
+    pub fn get_2(
+        &self,
+        pos: RelativePosition,
+        offset: RelativePosition,
+    ) -> (&'static BlockPrototype, &'static BlockPrototype) {
         let first = self.get_block(pos);
         let second = self.get_block(pos + offset);
         (first, second)

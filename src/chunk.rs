@@ -1,9 +1,9 @@
-use bevy::ecs::component::Component;
+use bevy::prelude::*;
 use bracket_noise::prelude::*;
 
 use crate::{
+    mod_manager::prototypes::{BlockPrototype, BlockPrototypes, Prototypes},
     position::{ChunkPosition, Position, RelativePosition},
-    voxel::BlockType,
 };
 
 #[derive(Component)]
@@ -85,8 +85,8 @@ impl From<RelativePosition> for VoxelIndex {
 
 #[derive(Clone, Debug)]
 enum Voxels {
-    Heterogeneous(Box<[BlockType]>),
-    Homogeneous(BlockType),
+    Heterogeneous(Box<[&'static BlockPrototype]>),
+    Homogeneous(&'static BlockPrototype),
 }
 
 #[derive(Clone, Debug)]
@@ -97,17 +97,17 @@ pub struct ChunkData {
 impl ChunkData {
     #[inline]
     #[must_use]
-    pub const fn get_block(&self, index: VoxelIndex) -> BlockType {
+    pub const fn get_block(&self, index: VoxelIndex) -> &'static BlockPrototype {
         match &self.voxels {
-            Voxels::Homogeneous(block_type) => *block_type,
+            Voxels::Homogeneous(block_type) => block_type,
             Voxels::Heterogeneous(voxels) => voxels[index.i()],
         }
     }
 
-    pub fn set_block(&mut self, index: VoxelIndex, block_type: BlockType) {
+    pub fn set_block(&mut self, index: VoxelIndex, block_type: &'static BlockPrototype) {
         match &mut self.voxels {
             Voxels::Homogeneous(old_block_type) => {
-                let mut new_voxels: Box<[BlockType]> =
+                let mut new_voxels: Box<[&'static BlockPrototype]> =
                     (0..CHUNK_SIZE3).map(|_| *old_block_type).collect();
                 new_voxels[index.i()] = block_type;
                 self.voxels = Voxels::Heterogeneous(new_voxels);
@@ -117,7 +117,8 @@ impl ChunkData {
 
                 let homogeneous = voxels.iter().all(|block| *block == block_type);
                 if homogeneous {
-                    self.voxels = Voxels::Homogeneous(block_type);
+                    todo!("woo hoo");
+                    //self.voxels = Voxels::Homogeneous(block_type);
                 }
             }
         }
@@ -131,17 +132,17 @@ impl ChunkData {
 
     /// shape our voxel data based on the `chunk_pos`
     #[must_use]
-    pub fn generate(chunk_position: ChunkPosition) -> Self {
+    pub fn generate(block_prototypes: &BlockPrototypes, chunk_position: ChunkPosition) -> Self {
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 > 21 {
             return Self {
-                voxels: Voxels::Homogeneous(BlockType::Air),
+                voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap()),
             };
         }
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 < -53 {
             return Self {
-                voxels: Voxels::Homogeneous(BlockType::Grass),
+                voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap()),
             };
         }
 
@@ -152,7 +153,7 @@ impl ChunkData {
         let mut y = 0;
         let mut z = 0;
 
-        let voxels: Box<[BlockType; CHUNK_SIZE3]> = std::array::from_fn(|_| {
+        let voxels: Box<[&'static BlockPrototype; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
             let wy = (y + world_position.y()) as f32;
             let wz = (z + world_position.z()) as f32;
@@ -166,11 +167,11 @@ impl ChunkData {
             let solid = h > wy;
 
             let block_type = if !solid {
-                BlockType::Air
+                block_prototypes.get("air").unwrap()
             } else if (h - wy) > 1.0 {
-                BlockType::Dirt
+                block_prototypes.get("dirt").unwrap()
             } else {
-                BlockType::Grass
+                block_prototypes.get("grass").unwrap()
             };
 
             x += 1;
@@ -191,7 +192,7 @@ impl ChunkData {
             let homogeneous = voxels.iter().all(|block_type| block_type == first);
             if homogeneous {
                 return Self {
-                    voxels: Voxels::Homogeneous(*first),
+                    voxels: Voxels::Homogeneous(first),
                 };
             }
         }

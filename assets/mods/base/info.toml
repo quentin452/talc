@@ -1,0 +1,12 @@
+[mod]
+name = "base"
+version = "0.1.0"
+talc_version = "0.1.0"
+authors = ["Zachary Picco"]
+description = "Voxel-based 3D automation game."
+homepage = "https://github.com/notnotmelon/talc"
+repository = "https://github.com/notnotmelon/talc"
+exclude = [".git"]
+
+[dependencies]
+core = "*"

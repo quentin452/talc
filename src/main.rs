@@ -4,11 +4,15 @@ use bevy::render::{
     RenderPlugin,
     settings::{RenderCreation, WgpuFeatures, WgpuSettings},
 };
-use bevy::{core::TaskPoolThreadAssignmentPolicy, pbr::CascadeShadowConfigBuilder, prelude::*};
+use bevy::{core::TaskPoolThreadAssignmentPolicy, prelude::*};
 use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
 
 use talc::{
     chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
+    mod_manager::{
+        mod_loader::ModLoaderPlugin,
+        prototypes::{BlockPrototypes, Prototypes},
+    },
     position::FloatingPosition,
     rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
@@ -19,7 +23,6 @@ use talc::{
     position::RelativePosition,
     scanner::{Scanner, ScannerPlugin},
     sun::SunPlugin,
-    voxel::BlockType,
     voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin},
 };
 
@@ -56,6 +59,7 @@ fn main() {
         // camera plugin
         .add_plugins(NoCameraPlayerPlugin)
         .add_plugins(RenderingPlugin)
+        .add_plugins(ModLoaderPlugin)
         .insert_resource(MovementSettings {
             sensitivity: 0.00015, // default: 0.00012
             speed: 64.0 * 2.0,    // default: 12.0
@@ -70,6 +74,7 @@ pub fn modify_current_terrain(
     query: Query<&Transform, With<Camera>>,
     key: Res<ButtonInput<KeyCode>>,
     mut voxel_engine: ResMut<VoxelEngine>,
+    block_prototypes: Res<BlockPrototypes>,
 ) {
     if !key.pressed(KeyCode::KeyN) {
         return;
@@ -87,7 +92,7 @@ pub fn modify_current_terrain(
             rng.random_range(0..CHUNK_SIZE_I32),
             rng.random_range(0..CHUNK_SIZE_I32),
         );
-        mods.push(ChunkModification(pos, BlockType::Air));
+        mods.push(ChunkModification(pos, block_prototypes.get("air").unwrap()));
     }
     voxel_engine.chunk_modifications.insert(camera_chunk, mods);
 }
@@ -122,6 +127,7 @@ pub fn setup(
         perceptual_roughness: 1.0,
         metallic: 0.01,
     })));
+
     commands.insert_resource(GlobalChunkWireframeMaterial(chunk_materials_wireframe.add(
         ChunkMaterialWireframe {
             reflectance: 0.5,

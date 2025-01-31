@@ -12,9 +12,15 @@ use bevy::{
     utils::{HashMap, HashSet},
 };
 
-use crate::chunk::{Chunk, ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32};
 use crate::position::{ChunkPosition, FloatingPosition, Position, RelativePosition};
 use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial};
+use crate::{
+    chunk::{
+        CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32,
+        Chunk, ChunkData,
+    },
+    mod_manager::prototypes::{BlockPrototype, BlockPrototypes},
+};
 use crate::{
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
@@ -22,7 +28,6 @@ use crate::{
     scanner::Scanner,
     smooth_transform::{SmoothTransformTo, smooth_transform},
     utils::get_edging_chunk,
-    voxel::BlockType,
 };
 use futures_lite::future;
 
@@ -69,7 +74,7 @@ pub struct VoxelEngine {
     pub chunk_modifications: HashMap<ChunkPosition, Vec<ChunkModification>>,
 }
 
-pub struct ChunkModification(pub RelativePosition, pub BlockType);
+pub struct ChunkModification(pub RelativePosition, pub &'static BlockPrototype);
 
 const DIAG_LOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("load_data_queue");
 const DIAG_UNLOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("unload_data_queue");
@@ -122,6 +127,7 @@ impl Default for VoxelEngine {
 #[allow(clippy::needless_pass_by_value)]
 pub fn start_data_tasks(
     mut voxel_engine: ResMut<VoxelEngine>,
+    block_prototypes: Res<BlockPrototypes>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
 ) {
     let task_pool = AsyncComputeTaskPool::get();
@@ -147,7 +153,8 @@ pub fn start_data_tasks(
         .max(0) as usize;
     for chunk_position in load_data_queue.drain(0..tasks_left) {
         let k = chunk_position;
-        let task = task_pool.spawn(async move { ChunkData::generate(k) });
+        let prototypes = block_prototypes.clone();
+        let task = task_pool.spawn(async move { ChunkData::generate(&prototypes, k) });
         data_tasks.insert(chunk_position, Some(task));
     }
 }

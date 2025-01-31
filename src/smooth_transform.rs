@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use bevy::{
     ecs::{
-        component::Component, entity::Entity, system::{Commands, Query, Res}
+        component::Component,
+        entity::Entity,
+        system::{Commands, Query, Res},
     },
     math::Vec3,
     time::Time,
@@ -27,7 +29,6 @@ impl SmoothTransformTo {
             blocks_per_second,
             end_timestamp: timer.elapsed()
                 + Duration::from_secs_f32(end.0.distance(Vec3::ZERO) / blocks_per_second),
-                
         }
     }
 }
@@ -44,10 +45,13 @@ pub fn smooth_transform(
         } else {
             commands.entity(entity).remove::<SmoothTransformTo>();
             let time_of_previous_update = timer.elapsed() - timer.delta();
-            if time_of_previous_update >= smooth_transform.end_timestamp { return; }
+            if time_of_previous_update >= smooth_transform.end_timestamp {
+                return;
+            }
             (smooth_transform.end_timestamp - time_of_previous_update).as_secs_f32()
         };
 
-        transform.translation += smooth_transform.direction * delta_seconds * smooth_transform.blocks_per_second;
+        transform.translation +=
+            smooth_transform.direction * delta_seconds * smooth_transform.blocks_per_second;
     }
 }

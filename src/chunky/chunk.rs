@@ -85,7 +85,8 @@ impl From<RelativePosition> for VoxelIndex {
     }
 }
 
-static BLOCK_REGISTRY: OnceLock<[Option<&'static BlockPrototype>; u8::MAX as usize]> = OnceLock::new();
+static BLOCK_REGISTRY: OnceLock<[Option<&'static BlockPrototype>; u8::MAX as usize]> =
+    OnceLock::new();
 type ThinBlockPointer = u16; // Classic rust reimplementing pointers. But &'static BlockPrototype is too fat :(
 
 #[inline]
@@ -95,20 +96,23 @@ pub fn access_block_registry(id: ThinBlockPointer) -> Option<&'static BlockProto
 }
 
 /// # Builds the block registry.
-/// 
+///
 /// ## What is a block registry?
 /// Each chunk stores data in a flat array of block prototypes.
 /// A naive implemetation may look like `Box<[&'static BlockPrototype]>`
 /// However the & borrow requires 4 bits.
 /// We can reduce the memory footprint by 4x with `Box<[u16]>`
 /// The block registry maps the u16 "thin pointer" back to `&'static BlockPrototype`.
-/// 
+///
 /// # Panics
 /// If the registry has already been constructed.
 pub fn set_block_registry(block_prototypes: &BlockPrototypes) {
-    assert!(BLOCK_REGISTRY.get().is_none(), "Block registry has already been constructed.");
+    assert!(
+        BLOCK_REGISTRY.get().is_none(),
+        "Block registry has already been constructed."
+    );
 
-    BLOCK_REGISTRY.get_or_init(|| {        
+    BLOCK_REGISTRY.get_or_init(|| {
         let mut registry = [None; u8::MAX as usize];
         for (_, &block) in block_prototypes.iter() {
             registry[block.id as usize] = Some(block);
@@ -135,7 +139,8 @@ impl ChunkData {
         match &self.voxels {
             Voxels::Homogeneous(block_pointer) => access_block_registry(*block_pointer),
             Voxels::Heterogeneous(voxels) => access_block_registry(voxels[index.i()]),
-        }.expect("Invalid thin block pointer.")
+        }
+        .expect("Invalid thin block pointer.")
     }
 
     pub fn set_block(&mut self, index: VoxelIndex, block_type: &'static BlockPrototype) {
@@ -164,7 +169,7 @@ impl ChunkData {
         matches!(self.voxels, Voxels::Homogeneous(_))
     }
 
-    /// shape our voxel data based on the `chunk_pos`
+    /// use noise shape our voxel data based on the `chunk_pos`
     #[must_use]
     pub fn generate(block_prototypes: &BlockPrototypes, chunk_position: ChunkPosition) -> Self {
         // hardcoded extremity check

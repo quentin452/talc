@@ -11,11 +11,9 @@ use bevy::prelude::*;
 use mlua::{FromLua, Lua, Table, Value};
 use serde::Deserialize;
 
-use crate::chunk::set_block_registry;
+use crate::chunky::chunk::set_block_registry;
 
-use super::prototypes::{
-    BlockPrototypesBuilder, PrototypesBuilder, RawBlockPrototype,
-};
+use super::prototypes::{BlockPrototypesBuilder, PrototypesBuilder, RawBlockPrototype};
 
 pub struct ModLoaderPlugin;
 

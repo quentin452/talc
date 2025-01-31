@@ -3,42 +3,43 @@ use std::sync::Arc;
 use bevy::{
     asset::LoadState,
     diagnostic::{Diagnostic, DiagnosticPath, RegisterDiagnostic},
+    platform_support::collections::{HashMap, HashSet},
     prelude::*,
     render::{
         mesh::Indices, primitives::Aabb, render_asset::RenderAssetUsages,
         render_resource::PrimitiveTopology,
     },
     tasks::{AsyncComputeTaskPool, Task, block_on},
-    platform_support::collections::{HashMap, HashSet},
 };
 
-use crate::position::{ChunkPosition, FloatingPosition, Position, RelativePosition};
-use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial};
-use crate::{
+use crate::chunky::{
     chunk::{
         CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32,
         Chunk, ChunkData,
     },
-    mod_manager::prototypes::{BlockPrototype, BlockPrototypes},
-};
-use crate::{
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
+    greedy_mesher_optimized,
     lod::Lod,
-    scanner::Scanner,
+};
+use crate::mod_manager::prototypes::{BlockPrototype, BlockPrototypes};
+use crate::rendering::{ATTRIBUTE_VOXEL, GlobalChunkMaterial};
+use crate::position::{ChunkPosition, FloatingPosition, Position, RelativePosition};
+use crate::{
+    player::render_distance::Scanner,
     smooth_transform::{SmoothTransformTo, smooth_transform},
     utils::get_edging_chunk,
 };
 use futures_lite::future;
 
-pub struct VoxelEnginePlugin;
+pub struct AsyncChunkloaderPlugin;
 
 pub const MAX_DATA_TASKS: usize = 64;
 pub const MAX_MESH_TASKS: usize = 32;
 
-impl Plugin for VoxelEnginePlugin {
+impl Plugin for AsyncChunkloaderPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(VoxelEngine::default());
+        app.insert_resource(AsyncChunkloader::default());
         // app.add_systems(Update, (start_data_tasks, start_mesh_tasks));
         app.add_systems(PostUpdate, (start_data_tasks, start_mesh_tasks));
         // app.add_systems(PostUpdate, (join_data, join_mesh));
@@ -60,7 +61,7 @@ impl Plugin for VoxelEnginePlugin {
 
 /// holds all voxel world data
 #[derive(Resource)]
-pub struct VoxelEngine {
+pub struct AsyncChunkloader {
     pub world_data: HashMap<ChunkPosition, Arc<ChunkData>>,
     pub vertex_diagnostic: HashMap<ChunkPosition, i32>,
     pub load_data_queue: Vec<ChunkPosition>,
@@ -84,7 +85,7 @@ const DIAG_VERTEX_COUNT: DiagnosticPath = DiagnosticPath::const_new("vertex_coun
 const DIAG_MESH_TASKS: DiagnosticPath = DiagnosticPath::const_new("mesh_tasks");
 const DIAG_DATA_TASKS: DiagnosticPath = DiagnosticPath::const_new("data_tasks");
 
-impl VoxelEngine {
+impl AsyncChunkloader {
     pub fn unload_all_meshes(&mut self, scanner: &Scanner, scanner_transform: &GlobalTransform) {
         // stop all any current proccessing
         self.load_mesh_queue.clear();
@@ -100,7 +101,7 @@ impl VoxelEngine {
     }
 }
 
-impl Default for VoxelEngine {
+impl Default for AsyncChunkloader {
     fn default() -> Self {
         assert!(
             Lod::default().size() == CHUNK_SIZE_I32,
@@ -126,13 +127,13 @@ impl Default for VoxelEngine {
 /// begin data building tasks for chunks in range
 #[allow(clippy::needless_pass_by_value)]
 pub fn start_data_tasks(
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
     block_prototypes: Res<BlockPrototypes>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
 ) {
     let task_pool = AsyncComputeTaskPool::get();
 
-    let VoxelEngine {
+    let AsyncChunkloader {
         load_data_queue,
         data_tasks,
         ..
@@ -160,8 +161,8 @@ pub fn start_data_tasks(
 }
 
 /// destroy enqueued, chunk data
-pub fn unload_data(mut voxel_engine: ResMut<VoxelEngine>) {
-    let VoxelEngine {
+pub fn unload_data(mut voxel_engine: ResMut<AsyncChunkloader>) {
+    let AsyncChunkloader {
         unload_data_queue,
         world_data,
         ..
@@ -172,8 +173,8 @@ pub fn unload_data(mut voxel_engine: ResMut<VoxelEngine>) {
 }
 
 /// destroy enqueued, chunk mesh entities
-pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<VoxelEngine>) {
-    let VoxelEngine {
+pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<AsyncChunkloader>) {
+    let AsyncChunkloader {
         unload_mesh_queue,
         chunk_entities,
         vertex_diagnostic,
@@ -196,12 +197,12 @@ pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<VoxelEngine>
 /// begin mesh building tasks for chunks in range
 #[allow(clippy::needless_pass_by_value)]
 pub fn start_mesh_tasks(
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
 ) {
     let task_pool = AsyncComputeTaskPool::get();
 
-    let VoxelEngine {
+    let AsyncChunkloader {
         load_mesh_queue,
         mesh_tasks,
         world_data,
@@ -223,16 +224,15 @@ pub fn start_mesh_tasks(
             continue;
         };
         let llod = *lod;
-        let task = task_pool.spawn(async move {
-            crate::greedy_mesher_optimized::build_chunk_mesh(&chunks_refs, llod)
-        });
+        let task = task_pool
+            .spawn(async move { greedy_mesher_optimized::build_chunk_mesh(&chunks_refs, llod) });
 
         mesh_tasks.push((chunk_position, Some(task)));
     }
 }
 
-pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
-    let VoxelEngine {
+pub fn start_modifications(mut voxel_engine: ResMut<AsyncChunkloader>) {
+    let AsyncChunkloader {
         world_data,
         chunk_modifications,
         load_mesh_queue,
@@ -259,8 +259,8 @@ pub fn start_modifications(mut voxel_engine: ResMut<VoxelEngine>) {
 }
 
 /// join the chunkdata threads
-pub fn join_data(mut voxel_engine: ResMut<VoxelEngine>) {
-    let VoxelEngine {
+pub fn join_data(mut voxel_engine: ResMut<AsyncChunkloader>) {
+    let AsyncChunkloader {
         world_data,
         data_tasks,
         ..
@@ -314,13 +314,13 @@ pub fn promote_dirty_meshes(
 /// join the multithreaded chunk mesh tasks, and construct a finalized chunk entity
 #[allow(clippy::needless_pass_by_value)]
 pub fn join_mesh(
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     global_chunk_material: Res<GlobalChunkMaterial>,
     timer: Res<Time>,
 ) {
-    let VoxelEngine {
+    let AsyncChunkloader {
         mesh_tasks,
         chunk_entities,
         vertex_diagnostic,

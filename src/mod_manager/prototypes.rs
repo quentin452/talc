@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use bevy::color::Color;
+use bevy::platform_support::collections::HashMap;
 use bevy::platform_support::collections::hash_map::Iter;
 use bevy::prelude::*;
-use bevy::platform_support::collections::HashMap;
 use mlua::FromLua;
 
 use super::lua_conversions::LuaColor;
@@ -34,7 +34,7 @@ pub(super) trait PrototypesBuilder {
     fn build(self) -> Self::Final;
 }
 
-pub trait Prototypes where {
+pub trait Prototypes {
     type T: Prototype;
     fn get(&self, name: &str) -> Option<&'static Self::T>;
     fn iter(&self) -> Iter<'_, std::boxed::Box<str>, &'static Self::T>;
@@ -101,26 +101,38 @@ impl RawPrototype for RawBlockPrototype {}
 
 impl FromLua for RawBlockPrototype {
     fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
-        let error = |message: String| {
-            mlua::Error::ToLuaConversionError{
-                message: Some(message),
-                to: "Rust Block Prototype",
-                from: "Lua Block Prototype".to_string(),
-            }
+        let error = |message: String| mlua::Error::ToLuaConversionError {
+            message: Some(message),
+            to: "Rust Block Prototype",
+            from: "Lua Block Prototype".to_string(),
         };
 
-        let Some(table) = value.as_table() else { Err(error("Block prototypes are expected to be a table.".to_string()))? };
+        let Some(table) = value.as_table() else {
+            Err(error(
+                "Block prototypes are expected to be a table.".to_string(),
+            ))?
+        };
 
-        let name: Box<str> = table.get::<String>("name").context("Could not parse BlockPrototype::name field.")?.into();
-        let is_transparent = table.get::<bool>("is_transparent").context("Could not parse BlockPrototype::is_transparent field.")?;
-        let is_meshable = table.get::<bool>("is_meshable").context("Could not parse BlockPrototype::is_meshable field.")?;
-        let color: Color = table.get::<LuaColor>("color").context("Could not parse BlockPrototype::color field.")?.into();
+        let name: Box<str> = table
+            .get::<String>("name")
+            .context("Could not parse BlockPrototype::name field.")?
+            .into();
+        let is_transparent = table
+            .get::<bool>("is_transparent")
+            .context("Could not parse BlockPrototype::is_transparent field.")?;
+        let is_meshable = table
+            .get::<bool>("is_meshable")
+            .context("Could not parse BlockPrototype::is_meshable field.")?;
+        let color: Color = table
+            .get::<LuaColor>("color")
+            .context("Could not parse BlockPrototype::color field.")?
+            .into();
 
         Ok(Self {
             name,
             is_transparent,
             is_meshable,
-            color
+            color,
         })
     }
 }

@@ -7,12 +7,11 @@ but anything above that might induce some frame lag, due to how the load/unload 
 
 use std::collections::VecDeque;
 
-use bevy::{prelude::*, platform_support::collections::HashSet};
+use bevy::{platform_support::collections::HashSet, prelude::*};
 
-use crate::{
-    chunk::CHUNK_SIZE_I32, constants::ADJACENT_CHUNK_DIRECTIONS, position::ChunkPosition,
-    utils::index_to_ivec3_bounds, voxel_engine::VoxelEngine,
-};
+use crate::{position::ChunkPosition, utils::index_to_ivec3_bounds};
+
+use crate::chunky::{chunk::CHUNK_SIZE_I32, constants::ADJACENT_CHUNK_DIRECTIONS, async_chunkloader::AsyncChunkloader};
 
 pub const MAX_DATA_TASKS: usize = 9;
 pub const MAX_MESH_TASKS: usize = 3;
@@ -87,7 +86,7 @@ impl Scanner {
 /// on scanner chunk change, enqueue chunks to load/unload
 fn detect_move(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
 ) {
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
@@ -203,7 +202,7 @@ fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
 
 pub fn scan_data(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
 ) {
     for (mut scanner, _g_transform) in &mut scanners {
         if voxel_engine.data_tasks.len() >= MAX_DATA_TASKS {
@@ -234,7 +233,7 @@ pub fn scan_data(
 
 pub fn scan_data_unload(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
 ) {
     // find all loaded and check if in range
     for (mut scanner, _g_transform) in &mut scanners {
@@ -248,7 +247,7 @@ pub fn scan_data_unload(
     }
 }
 
-pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<VoxelEngine>) {
+pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<AsyncChunkloader>) {
     // find all loaded and check if in range
     for mut scanner in &mut scanners {
         for chunk_pos in scanner.unresolved_mesh_unload.drain(..) {
@@ -257,7 +256,7 @@ pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: Res
     }
 }
 
-pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<VoxelEngine>) {
+pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<AsyncChunkloader>) {
     for mut scanner in &mut scanners {
         // if voxel_engine.data_tasks.len() >= MAX_MESH_TASKS {
         //     return;

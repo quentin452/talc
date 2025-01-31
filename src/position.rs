@@ -2,7 +2,7 @@ use std::ops::{Add, Div, Mul, Sub};
 
 use bevy::math::{IVec3, Vec3};
 
-use crate::chunk::CHUNK_SIZE_I32;
+use crate::chunky::chunk::CHUNK_SIZE_I32;
 
 /// A grid aligned position in the world using absolute coordinates.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]

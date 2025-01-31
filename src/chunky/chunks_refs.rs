@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
-use bevy::platform_support::collections::HashMap;
 use bevy::math::IVec3;
+use bevy::platform_support::collections::HashMap;
 
 use crate::{
-    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
     mod_manager::prototypes::BlockPrototype,
     position::{ChunkPosition, RelativePosition},
-    quad::Direction,
     utils::index_to_ivec3_bounds,
+};
+
+use super::{
+    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
+    quad::Direction,
 };
 
 // Pointers to chunk data, repersented as the middle one with all their neighbours in 3x3x3 cube.

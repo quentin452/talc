@@ -1,24 +1,37 @@
 use std::f32::consts::PI;
 
-use bevy::{app::TaskPoolThreadAssignmentPolicy, core_pipeline::bloom::Bloom, pbr::{Atmosphere, AtmosphereSettings}, render::{
-    settings::{RenderCreation, WgpuFeatures, WgpuSettings}, RenderPlugin
-}};
 use bevy::prelude::*;
+use bevy::{
+    app::TaskPoolThreadAssignmentPolicy,
+    core_pipeline::bloom::Bloom,
+    pbr::{Atmosphere, AtmosphereSettings},
+    render::{
+        RenderPlugin,
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+    },
+};
 
+use talc::player::{
+    debug_camera::{FlyCam, NoCameraPlayerPlugin},
+    render_distance::Scanner,
+    render_distance::ScannerPlugin,
+};
 use talc::{
-    chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32}, debug_camera::{FlyCam, NoCameraPlayerPlugin}, mod_manager::{
+    chunky::chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
+    mod_manager::{
         mod_loader::ModLoaderPlugin,
         prototypes::{BlockPrototypes, Prototypes},
-    }, position::FloatingPosition, rendering::{
+    },
+    position::FloatingPosition,
+    rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
         RenderingPlugin,
-    }
+    },
 };
 use talc::{
     position::RelativePosition,
-    scanner::{Scanner, ScannerPlugin},
     sun::SunPlugin,
-    voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin},
+    chunky::async_chunkloader::{ChunkModification, AsyncChunkloader, AsyncChunkloaderPlugin},
 };
 
 use rand::Rng;
@@ -46,7 +59,7 @@ fn main() {
                     ..default()
                 },
             }),))
-        .add_plugins(VoxelEnginePlugin)
+        .add_plugins(AsyncChunkloaderPlugin)
         .add_plugins(SunPlugin)
         .add_plugins(ScannerPlugin)
         .add_systems(Startup, setup)
@@ -61,7 +74,7 @@ fn main() {
 pub fn modify_current_terrain(
     query: Query<&Transform, With<Camera>>,
     key: Res<ButtonInput<KeyCode>>,
-    mut voxel_engine: ResMut<VoxelEngine>,
+    mut voxel_engine: ResMut<AsyncChunkloader>,
     block_prototypes: Res<BlockPrototypes>,
 ) {
     if !key.pressed(KeyCode::KeyN) {

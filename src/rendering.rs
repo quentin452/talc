@@ -8,7 +8,7 @@ use bevy::{
     render::render_resource::AsBindGroup,
 };
 
-use crate::chunk::Chunk;
+use crate::chunky::chunk::Chunk;
 
 #[derive(Resource)]
 pub enum ChunkMaterialWireframeMode {

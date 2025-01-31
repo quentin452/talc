@@ -1,4 +1,4 @@
-use crate::lod::Lod;
+use super::lod::Lod;
 use bevy::math::{IVec3, ivec3};
 
 // helper for transforming translations based dir or "axis"

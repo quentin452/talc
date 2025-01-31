@@ -1,6 +1,6 @@
-use std::time::Duration;
-use bevy::prelude::*;
 use crate::position::FloatingPosition;
+use bevy::prelude::*;
+use std::time::Duration;
 
 #[derive(Component)]
 #[require(Transform)]

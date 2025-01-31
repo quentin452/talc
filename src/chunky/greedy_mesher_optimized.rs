@@ -1,17 +1,20 @@
 use std::collections::VecDeque;
 
-use bevy::{prelude::*, platform_support::collections::HashMap};
+use bevy::{platform_support::collections::HashMap, prelude::*};
 
 use crate::{
+    mod_manager::prototypes::BlockPrototype,
+    position::RelativePosition,
+    utils::{generate_indices, make_vertex_u32},
+};
+
+use super::{
+    face_direction::FaceDir,
     chunk::{CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE3},
     chunk_mesh::ChunkMesh,
     chunks_refs::ChunksRefs,
     constants::ADJACENT_AO_DIRS,
-    face_direction::FaceDir,
     lod::Lod,
-    mod_manager::prototypes::BlockPrototype,
-    position::RelativePosition,
-    utils::{generate_indices, make_vertex_u32},
 };
 
 #[inline]

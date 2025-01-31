@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    chunk::CHUNK_SIZE_I32,
+    chunky::chunk::CHUNK_SIZE_I32,
     position::{ChunkPosition, RelativePosition},
 };
 

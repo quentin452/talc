@@ -61,6 +61,7 @@ fn daylight_cycle(
 
     for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));
-        directional.illuminance = percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT * 0.4;
+        directional.illuminance =
+            percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT * 0.4;
     }
 }

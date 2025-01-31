@@ -12,7 +12,7 @@ use mlua::{FromLua, Lua, Table, Value};
 use serde::Deserialize;
 
 use super::prototypes::{
-    BlockPrototype, BlockPrototypesBuilder, PrototypesBuilder, RawBlockPrototype,
+    BlockPrototypesBuilder, PrototypesBuilder, RawBlockPrototype,
 };
 
 pub struct ModLoaderPlugin;

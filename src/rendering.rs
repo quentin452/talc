@@ -8,6 +8,8 @@ use bevy::{
     render::render_resource::AsBindGroup,
 };
 
+use crate::chunk::Chunk;
+
 #[derive(Resource)]
 pub enum ChunkMaterialWireframeMode {
     On,
@@ -25,18 +27,14 @@ impl Plugin for RenderingPlugin {
     }
 }
 
-#[derive(Component, Clone)]
-struct ChunkMaterialComponent;
-
-#[derive(Component, Clone)]
-struct ChunkMaterialWireframeComponent;
-
 // This system toggles between wireframe rendering mode and solid rendering mode when the T key is pressed.
 #[allow(clippy::needless_pass_by_value)]
 fn apply_chunk_material(
-    no_wireframe: Query<Entity, With<ChunkMaterialComponent>>,
-    wireframe: Query<Entity, With<ChunkMaterialWireframeComponent>>,
+    without_wireframe: Query<(Entity, &MeshMaterial3d<ChunkMaterial>), With<Chunk>>,
+    with_wireframe: Query<(Entity, &MeshMaterial3d<ChunkMaterialWireframe>), With<Chunk>>,
     input: Res<ButtonInput<KeyCode>>,
+    global_chunk_material: Res<GlobalChunkMaterial>,
+    global_chunk_wireframe_material: Res<GlobalChunkWireframeMaterial>,
     mut mode: ResMut<ChunkMaterialWireframeMode>,
     mut commands: Commands,
 ) {
@@ -44,25 +42,26 @@ fn apply_chunk_material(
     if !input.just_pressed(KeyCode::KeyT) {
         return;
     }
+
     *mode = match *mode {
         F::On => F::Off,
         F::Off => F::On,
     };
     match *mode {
         F::On => {
-            for entity in no_wireframe.iter() {
+            for (entity, _) in without_wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(ChunkMaterialWireframeComponent)
-                    .remove::<ChunkMaterialComponent>();
+                    .remove::<MeshMaterial3d<ChunkMaterial>>()
+                    .insert(MeshMaterial3d(global_chunk_wireframe_material.0.clone()));
             }
         }
         F::Off => {
-            for entity in wireframe.iter() {
+            for (entity, _) in with_wireframe.iter() {
                 commands
                     .entity(entity)
-                    .insert(ChunkMaterialComponent)
-                    .remove::<ChunkMaterialWireframeComponent>();
+                    .remove::<MeshMaterial3d<ChunkMaterial>>()
+                    .insert(MeshMaterial3d(global_chunk_material.0.clone()));
             }
         }
     }
@@ -122,6 +121,7 @@ impl Material for ChunkMaterial {
         "shaders/chunk_prepass.wgsl".into()
     }
 }
+
 // copy of chunk material pipeline but with wireframe
 #[derive(Asset, Reflect, AsBindGroup, Debug, Clone)]
 pub struct ChunkMaterialWireframe {

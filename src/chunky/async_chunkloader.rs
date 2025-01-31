@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use bevy::{
     asset::LoadState,
-    diagnostic::{Diagnostic, DiagnosticPath, RegisterDiagnostic},
     platform_support::collections::{HashMap, HashSet},
     prelude::*,
     render::{
@@ -49,13 +48,6 @@ impl Plugin for AsyncChunkloaderPlugin {
             Update,
             ((join_data, join_mesh), (unload_data, unload_mesh)).chain(),
         );
-        app.register_diagnostic(Diagnostic::new(DIAG_LOAD_MESH_QUEUE));
-        app.register_diagnostic(Diagnostic::new(DIAG_UNLOAD_MESH_QUEUE));
-        app.register_diagnostic(Diagnostic::new(DIAG_LOAD_DATA_QUEUE));
-        app.register_diagnostic(Diagnostic::new(DIAG_UNLOAD_DATA_QUEUE));
-        app.register_diagnostic(Diagnostic::new(DIAG_VERTEX_COUNT));
-        app.register_diagnostic(Diagnostic::new(DIAG_MESH_TASKS));
-        app.register_diagnostic(Diagnostic::new(DIAG_DATA_TASKS));
     }
 }
 
@@ -63,7 +55,6 @@ impl Plugin for AsyncChunkloaderPlugin {
 #[derive(Resource)]
 pub struct AsyncChunkloader {
     pub world_data: HashMap<ChunkPosition, Arc<ChunkData>>,
-    pub vertex_diagnostic: HashMap<ChunkPosition, i32>,
     pub load_data_queue: Vec<ChunkPosition>,
     pub load_mesh_queue: Vec<ChunkPosition>,
     pub unload_data_queue: Vec<ChunkPosition>,
@@ -76,14 +67,6 @@ pub struct AsyncChunkloader {
 }
 
 pub struct ChunkModification(pub RelativePosition, pub &'static BlockPrototype);
-
-const DIAG_LOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("load_data_queue");
-const DIAG_UNLOAD_DATA_QUEUE: DiagnosticPath = DiagnosticPath::const_new("unload_data_queue");
-const DIAG_LOAD_MESH_QUEUE: DiagnosticPath = DiagnosticPath::const_new("load_mesh_queue");
-const DIAG_UNLOAD_MESH_QUEUE: DiagnosticPath = DiagnosticPath::const_new("unload_mesh_queue");
-const DIAG_VERTEX_COUNT: DiagnosticPath = DiagnosticPath::const_new("vertex_count");
-const DIAG_MESH_TASKS: DiagnosticPath = DiagnosticPath::const_new("mesh_tasks");
-const DIAG_DATA_TASKS: DiagnosticPath = DiagnosticPath::const_new("data_tasks");
 
 impl AsyncChunkloader {
     pub fn unload_all_meshes(&mut self, scanner: &Scanner, scanner_transform: &GlobalTransform) {
@@ -118,7 +101,6 @@ impl Default for AsyncChunkloader {
             mesh_tasks: Vec::new(),
             chunk_entities: HashMap::default(),
             lod: Lod::default(),
-            vertex_diagnostic: HashMap::default(),
             chunk_modifications: HashMap::default(),
         }
     }
@@ -177,7 +159,6 @@ pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<AsyncChunklo
     let AsyncChunkloader {
         unload_mesh_queue,
         chunk_entities,
-        vertex_diagnostic,
         ..
     } = voxel_engine.as_mut();
     let mut retry = Vec::new();
@@ -185,7 +166,6 @@ pub fn unload_mesh(mut commands: Commands, mut voxel_engine: ResMut<AsyncChunklo
         let Some(chunk_id) = chunk_entities.remove(&chunk_pos) else {
             continue;
         };
-        vertex_diagnostic.remove(&chunk_pos);
         if let Some(mut entity_commands) = commands.get_entity(chunk_id) {
             entity_commands.despawn();
         }
@@ -323,7 +303,6 @@ pub fn join_mesh(
     let AsyncChunkloader {
         mesh_tasks,
         chunk_entities,
-        vertex_diagnostic,
         ..
     } = voxel_engine.as_mut();
     for (chunk_position, task_option) in mesh_tasks.iter_mut() {
@@ -345,7 +324,6 @@ pub fn join_mesh(
             PrimitiveTopology::TriangleList,
             RenderAssetUsages::RENDER_WORLD,
         );
-        vertex_diagnostic.insert(*chunk_position, mesh.vertices.len() as i32);
         bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, mesh.vertices.clone());
         bevy_mesh.insert_indices(Indices::U32(mesh.indices.clone()));
         let mesh_handle = meshes.add(bevy_mesh);

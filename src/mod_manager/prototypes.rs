@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use bevy::color::Color;
 use bevy::prelude::*;
-use bevy::utils::hashbrown::HashMap;
+use bevy::platform_support::collections::HashMap;
 use mlua::FromLua;
 
 use super::lua_conversions::LuaColor;
@@ -61,7 +61,7 @@ impl PrototypesBuilder for BlockPrototypesBuilder {
     type Final = BlockPrototypes;
 
     fn new() -> Self {
-        Self(0, HashMap::new())
+        Self(0, HashMap::default())
     }
 
     fn add(&mut self, prototype: Self::BuiltFrom) {

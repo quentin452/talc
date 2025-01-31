@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, platform_support::collections::HashMap};
 
 use crate::{
     chunk::{CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE3},
@@ -126,12 +126,12 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
     //  might become an issue in the future, when there are more block types.
     //  consider using a single hashmap with key (axis, block_hash, y).
     let mut data: [HashMap<u32, HashMap<u32, [u32; CHUNK_SIZE]>>; 6] = [
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
+        HashMap::default(),
+        HashMap::default(),
+        HashMap::default(),
+        HashMap::default(),
+        HashMap::default(),
+        HashMap::default(),
     ];
 
     // find faces and build binary planes based on the voxel block+ao etc...
@@ -213,7 +213,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
                         &mut vertices,
                         facedir,
                         axis_pos,
-                        &Lod::default(),
+                        Lod::default(),
                         ao,
                         block_type,
                     );
@@ -247,7 +247,7 @@ impl GreedyQuad {
         vertices: &mut Vec<u32>,
         face_dir: FaceDir,
         axis: u32,
-        lod: &Lod,
+        lod: Lod,
         ao: u32,
         block_type: u32,
     ) {

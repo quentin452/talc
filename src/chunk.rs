@@ -45,7 +45,7 @@ impl VoxelIndex {
 
     #[inline]
     #[must_use]
-    pub const fn i(&self) -> usize {
+    pub const fn i(self) -> usize {
         self.0
     }
 }
@@ -134,13 +134,13 @@ impl ChunkData {
     #[must_use]
     pub fn generate(block_prototypes: &BlockPrototypes, chunk_position: ChunkPosition) -> Self {
         // hardcoded extremity check
-        if chunk_position.y() * CHUNK_SIZE_I32 > 21 {
+        if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap()),
             };
         }
         // hardcoded extremity check
-        if chunk_position.y() * CHUNK_SIZE_I32 < -53 {
+        if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap()),
             };
@@ -155,7 +155,7 @@ impl ChunkData {
 
         let voxels: Box<[&'static BlockPrototype; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
-            let wy = (y + world_position.y()) as f32;
+            let wy = (y + world_position.y()) as f32 - 200.;
             let wz = (z + world_position.z()) as f32;
 
             let scale = 1.0;

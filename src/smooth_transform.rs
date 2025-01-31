@@ -1,16 +1,5 @@
 use std::time::Duration;
-
-use bevy::{
-    ecs::{
-        component::Component,
-        entity::Entity,
-        system::{Commands, Query, Res},
-    },
-    math::Vec3,
-    time::Time,
-    transform::components::Transform,
-};
-
+use bevy::prelude::*;
 use crate::position::FloatingPosition;
 
 #[derive(Component)]

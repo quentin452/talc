@@ -14,7 +14,7 @@ pub enum Direction {
 impl Direction {
     /// normal data is packed in the shader
     #[must_use]
-    pub const fn get_normal(&self) -> i32 {
+    pub const fn get_normal(self) -> i32 {
         match self {
             Self::Left => 0i32,
             Self::Right => 1i32,

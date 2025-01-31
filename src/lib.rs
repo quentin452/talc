@@ -14,3 +14,4 @@ pub mod smooth_transform;
 pub mod sun;
 pub mod utils;
 pub mod voxel_engine;
+pub mod debug_camera;

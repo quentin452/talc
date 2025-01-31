@@ -1,23 +1,18 @@
 use std::f32::consts::PI;
 
-use bevy::render::{
-    RenderPlugin,
-    settings::{RenderCreation, WgpuFeatures, WgpuSettings},
-};
-use bevy::{core::TaskPoolThreadAssignmentPolicy, prelude::*};
-use bevy_inspector_egui::quick::{AssetInspectorPlugin, WorldInspectorPlugin};
+use bevy::{app::TaskPoolThreadAssignmentPolicy, core_pipeline::bloom::Bloom, pbr::{Atmosphere, AtmosphereSettings}, render::{
+    settings::{RenderCreation, WgpuFeatures, WgpuSettings}, RenderPlugin
+}};
+use bevy::prelude::*;
 
 use talc::{
-    chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
-    mod_manager::{
+    chunk::{CHUNK_SIZE2, CHUNK_SIZE_I32}, debug_camera::{FlyCam, NoCameraPlayerPlugin}, mod_manager::{
         mod_loader::ModLoaderPlugin,
         prototypes::{BlockPrototypes, Prototypes},
-    },
-    position::FloatingPosition,
-    rendering::{
+    }, position::FloatingPosition, rendering::{
         ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
         RenderingPlugin,
-    },
+    }
 };
 use talc::{
     position::RelativePosition,
@@ -26,7 +21,6 @@ use talc::{
     voxel_engine::{ChunkModification, VoxelEngine, VoxelEnginePlugin},
 };
 
-use bevy_flycam::prelude::*;
 use rand::Rng;
 
 fn main() {
@@ -46,25 +40,19 @@ fn main() {
                         min_threads: 1,
                         max_threads: 8,
                         percent: 0.75,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
                     },
                     ..default()
                 },
             }),))
-        .add_plugins(WorldInspectorPlugin::new())
-        .add_plugins(AssetInspectorPlugin::<ChunkMaterial>::default())
         .add_plugins(VoxelEnginePlugin)
         .add_plugins(SunPlugin)
         .add_plugins(ScannerPlugin)
         .add_systems(Startup, setup)
-        // camera plugin
-        .add_plugins(NoCameraPlayerPlugin)
         .add_plugins(RenderingPlugin)
         .add_plugins(ModLoaderPlugin)
-        .insert_resource(MovementSettings {
-            sensitivity: 0.00015, // default: 0.00012
-            speed: 64.0 * 2.0,    // default: 12.0
-                                  // speed: 32.0 * 12.0,   // default: 12.0
-        })
+        .add_plugins(NoCameraPlayerPlugin)
         .add_systems(Update, modify_current_terrain)
         .run();
 }
@@ -108,7 +96,7 @@ pub fn setup(
         Name::new("Sun"),
         talc::sun::Sun,
         DirectionalLight {
-            illuminance: 10000.0,
+            illuminance: light_consts::lux::RAW_SUNLIGHT,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, PI / 2., -PI / 4.)),
@@ -117,8 +105,34 @@ pub fn setup(
     commands
         .spawn((
             Scanner::new(12),
-            Transform::from_xyz(0.0, 2.0, 0.5),
+            Transform::from_xyz(0.0, 200.0, 0.5),
             Camera3d::default(),
+            FlyCam,
+            Camera {
+                hdr: true,
+                ..default()
+            },
+            Atmosphere {
+                bottom_radius: 5_000.0,
+                top_radius: 64_600.0 * 3.,
+                ground_albedo: Vec3::splat(0.3),
+                rayleigh_density_exp_scale: 1.0 / 8_000.0,
+                rayleigh_scattering: Vec3::new(5.802e-5, 13.558e-5, 33.100e-5),
+                mie_density_exp_scale: 1.0 / 1_200.0,
+                mie_scattering: 3.996e-6,
+                mie_absorption: 0.444e-6,
+                mie_asymmetry: 0.8,
+                ozone_layer_altitude: 25_000.0,
+                ozone_layer_width: 30_000.0,
+                ozone_absorption: Vec3::new(0.650e-6, 1.881e-6, 0.085e-6),
+            },
+            AtmosphereSettings {
+                aerial_view_lut_max_distance: 3.2,
+                scene_units_to_m: 1.,
+                ..Default::default()
+            },
+            //Tonemapping::AgX,
+            Bloom::NATURAL,
         ))
         .insert(FlyCam);
 

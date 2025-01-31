@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 
 pub const DAY_TIME_SEC: f32 = 60.0;
-pub const NIGHT_TIME_SEC: f32 = 1.0;
+pub const NIGHT_TIME_SEC: f32 = 10.0;
 pub const CYCLE_TIME: f32 = DAY_TIME_SEC + NIGHT_TIME_SEC;
 
 /// current time of day
@@ -15,11 +14,6 @@ struct SkyTime(pub f32);
 #[derive(Resource)]
 struct CycleTimer(Timer);
 
-#[derive(Resource, Reflect)]
-pub struct SunSettings {
-    illuminance: f32,
-}
-
 // Marker for updating the position of the light, not needed unless we have multiple lights
 #[derive(Component)]
 pub struct Sun;
@@ -28,17 +22,12 @@ pub struct SunPlugin;
 
 impl Plugin for SunPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<SunSettings>();
         app.insert_resource(SkyTime(0f32));
-        app.insert_resource(SunSettings {
-            illuminance: 4000.0,
-        });
         app.insert_resource(CycleTimer(Timer::new(
-            Duration::from_millis(450),
+            Duration::from_millis(50),
             TimerMode::Repeating,
         )));
         app.add_systems(Update, daylight_cycle);
-        app.add_plugins(ResourceInspectorPlugin::<SunSettings>::default());
     }
 }
 
@@ -48,7 +37,6 @@ fn daylight_cycle(
     mut timer: ResMut<SkyTime>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    sun_settings: Res<SunSettings>,
     mut cycle_timer: ResMut<CycleTimer>,
 ) {
     cycle_timer.0.tick(time.delta());
@@ -73,6 +61,6 @@ fn daylight_cycle(
 
     for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));
-        directional.illuminance = percent.sin().max(0.0).powi(2) * sun_settings.illuminance;
+        directional.illuminance = percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT * 0.4;
     }
 }

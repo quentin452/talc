@@ -55,7 +55,6 @@ impl Mod {
             exclude: Vec<String>,
         }
 
-        print!("{path:?}");
         let contents = std::fs::read_to_string(path.join("info.toml")).unwrap();
         let mod_info: ModInfo = toml::from_str(&contents).unwrap();
 

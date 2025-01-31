@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use bevy::{math::IVec3, utils::HashMap};
+use bevy::platform_support::collections::HashMap;
+use bevy::math::IVec3;
 
 use crate::{
     chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
@@ -110,8 +111,8 @@ impl ChunksRefs {
     pub fn get_von_neumann(
         &self,
         pos: RelativePosition,
-    ) -> Option<Vec<(Direction, &'static BlockPrototype)>> {
-        Some(vec![
+    ) -> [(Direction, &'static BlockPrototype); 6] {
+        [
             (
                 Direction::Back,
                 self.get_block(pos + RelativePosition::new(0, 0, -1)),
@@ -136,7 +137,7 @@ impl ChunksRefs {
                 Direction::Right,
                 self.get_block(pos + RelativePosition::new(1, 0, 0)),
             ),
-        ])
+        ]
     }
 
     #[must_use]

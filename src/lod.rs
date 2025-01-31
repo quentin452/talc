@@ -12,7 +12,7 @@ pub enum Lod {
 impl Lod {
     /// the amount of voxels per axis
     #[must_use]
-    pub const fn size(&self) -> i32 {
+    pub const fn size(self) -> i32 {
         match self {
             Self::L32 => 32,
             Self::L16 => 16,
@@ -25,7 +25,7 @@ impl Lod {
     /// how much to multiply to reach next voxel
     /// lower lod gives higher jump
     #[must_use]
-    pub const fn jump_index(&self) -> i32 {
+    pub const fn jump_index(self) -> i32 {
         match self {
             Self::L32 => 1,
             Self::L16 => 2,

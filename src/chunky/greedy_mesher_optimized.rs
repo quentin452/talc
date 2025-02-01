@@ -1,18 +1,15 @@
 use std::collections::VecDeque;
 
-use bevy::{platform_support::collections::HashMap, prelude::*};
+use bevy::{asset::RenderAssetUsages, platform_support::collections::HashMap, prelude::*, render::mesh::{Indices, PrimitiveTopology}};
 
 use crate::{
-    mod_manager::prototypes::BlockPrototype,
-    position::RelativePosition,
-    utils::{generate_indices, make_vertex_u32},
+    mod_manager::prototypes::BlockPrototype, position::RelativePosition, rendering::ATTRIBUTE_VOXEL, utils::{generate_indices, make_vertex_u32}
 };
 
 use super::{
     face_direction::FaceDir,
     chunk::{CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE3},
-    chunk_mesh::ChunkMesh,
-    chunks_refs::ChunksRefs,
+    chunks_refs::ChunkRefs,
     constants::ADJACENT_AO_DIRS,
     lod::Lod,
 };
@@ -36,12 +33,12 @@ fn add_voxel_to_axis_cols(
 }
 
 #[must_use]
-pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh> {
+pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
     }
-    let mut mesh = ChunkMesh::default();
+    let mut vertices: Vec<u32> = vec![];
 
     // solid binary for each x,y,z axis (3)
     #[allow(clippy::large_stack_arrays)]
@@ -52,7 +49,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
     let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
 
     // inner chunk voxels.
-    let chunk = &*chunks_refs.adjacent_chunks[ChunksRefs::vec3_to_chunk_index(IVec3::new(1, 1, 1))];
+    let chunk = &*chunks_refs.adjacent_chunks[ChunkRefs::vec3_to_chunk_index(IVec3::new(1, 1, 1))];
 
     {
         let mut x = 0;
@@ -195,7 +192,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
         }
     }
 
-    let mut vertices = vec![];
+    let mut extra_vertices = vec![];
     for (axis, block_ao_data) in data.into_iter().enumerate() {
         let facedir = match axis {
             0 => FaceDir::Down,
@@ -213,7 +210,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
 
                 for q in quads_from_axis {
                     q.append_vertices(
-                        &mut vertices,
+                        &mut extra_vertices,
                         facedir,
                         axis_pos,
                         Lod::default(),
@@ -224,14 +221,20 @@ pub fn build_chunk_mesh(chunks_refs: &ChunksRefs, lod: Lod) -> Option<ChunkMesh>
             }
         }
     }
-
-    mesh.vertices.extend(vertices);
-    if mesh.vertices.is_empty() {
-        None
-    } else {
-        mesh.indices = generate_indices(mesh.vertices.len());
-        Some(mesh)
+    vertices.extend(extra_vertices);
+    
+    if vertices.is_empty() {
+        return None;
     }
+
+    let mut bevy_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    let vertex_count = vertices.len();
+    bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, vertices);
+    bevy_mesh.insert_indices(Indices::U32(generate_indices(vertex_count)));
+    Some(bevy_mesh)
 }
 
 // todo: compress further?

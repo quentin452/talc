@@ -1,53 +1,52 @@
-use std::sync::Arc;
+use std::{hash::Hash, sync::Arc};
 
-use bevy::math::IVec3;
-use bevy::platform_support::collections::HashMap;
+use bevy::prelude::*;
 
 use crate::{
     mod_manager::prototypes::BlockPrototype,
-    position::{ChunkPosition, RelativePosition},
-    utils::index_to_ivec3_bounds,
+    position::{ChunkPosition, RelativePosition}, utils::index_to_ivec3_bounds,
 };
 
 use super::{
-    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
-    quad::Direction,
+    async_chunkloader::Chunks, chunk::{ChunkData, VoxelIndex, CHUNK_SIZE, CHUNK_SIZE_I32}, constants::ADJACENT_CHUNK_DIRECTIONS, quad::Direction
 };
 
 // Pointers to chunk data, repersented as the middle one with all their neighbours in 3x3x3 cube.
 #[derive(Clone)]
-pub struct ChunksRefs {
+pub struct ChunkRefs {
     pub adjacent_chunks: [Arc<ChunkData>; 27],
+    pub center_chunk_position: ChunkPosition
 }
 
-impl ChunksRefs {
+impl ChunkRefs {
     /// construct a `ChunkRefs` at `middle_chunk` position
     /// # Panics
     /// if `ChunkData` doesn't exist in input `world_data`
     #[must_use]
     pub fn try_new(
-        world_data: &HashMap<ChunkPosition, Arc<ChunkData>>,
-        middle_chunk: ChunkPosition,
+        chunks: &Chunks,
+        center_chunk_position: ChunkPosition,
     ) -> Option<Self> {
         let get_chunk = |i| {
+            //let offset = ADJACENT_CHUNK_DIRECTIONS[i] + IVec3::NEG_ONE;
             let offset = ChunkPosition(index_to_ivec3_bounds(i, 3) + IVec3::NEG_ONE);
-            Some(Arc::clone(world_data.get(&(middle_chunk + offset))?))
+            chunks.0.get(&(center_chunk_position + offset))
         };
         #[rustfmt::skip]
         let adjacent_chunks: [Arc<ChunkData>; 27] = [
-          get_chunk(0)?, get_chunk(1)?, get_chunk(2)?,
-          get_chunk(3)?, get_chunk(4)?, get_chunk(5)?,
-          get_chunk(6)?, get_chunk(7)?, get_chunk(8)?,
+          get_chunk(0)?.clone(), get_chunk(1)?.clone(), get_chunk(2)?.clone(),
+          get_chunk(3)?.clone(), get_chunk(4)?.clone(), get_chunk(5)?.clone(),
+          get_chunk(6)?.clone(), get_chunk(7)?.clone(), get_chunk(8)?.clone(),
 
-          get_chunk(9)?, get_chunk(10)?, get_chunk(11)?,
-          get_chunk(12)?, get_chunk(13)?, get_chunk(14)?,
-          get_chunk(15)?, get_chunk(16)?, get_chunk(17)?,
+          get_chunk(9)?.clone(), get_chunk(10)?.clone(), get_chunk(11)?.clone(),
+          get_chunk(12)?.clone(), get_chunk(13)?.clone(), get_chunk(14)?.clone(),
+          get_chunk(15)?.clone(), get_chunk(16)?.clone(), get_chunk(17)?.clone(),
 
-          get_chunk(18)?, get_chunk(19)?, get_chunk(20)?,
-          get_chunk(21)?, get_chunk(22)?, get_chunk(23)?,
-          get_chunk(24)?, get_chunk(25)?, get_chunk(26)?,
+          get_chunk(18)?.clone(), get_chunk(19)?.clone(), get_chunk(20)?.clone(),
+          get_chunk(21)?.clone(), get_chunk(22)?.clone(), get_chunk(23)?.clone(),
+          get_chunk(24)?.clone(), get_chunk(25)?.clone(), get_chunk(26)?.clone(),
         ];
-        Some(Self { adjacent_chunks })
+        Some(Self { adjacent_chunks, center_chunk_position })
     }
 
     #[must_use]
@@ -160,5 +159,17 @@ impl ChunksRefs {
         let first = self.get_block(pos);
         let second = self.get_block(pos + offset);
         (first, second)
+    }
+}
+
+impl Hash for ChunkRefs {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.center_chunk_position.hash(state);
+    }
+}
+
+impl PartialEq<ChunkPosition> for ChunkRefs {
+    fn eq(&self, other: &ChunkPosition) -> bool {
+        *other == self.center_chunk_position
     }
 }

@@ -31,8 +31,9 @@ use talc::{
 use talc::{
     position::RelativePosition,
     sun::SunPlugin,
-    chunky::async_chunkloader::{ChunkModification, AsyncChunkloader, AsyncChunkloaderPlugin},
+    chunky::async_chunkloader::{AsyncChunkloader, AsyncChunkloaderPlugin},
 };
+use talc::smooth_transform::smooth_transform;
 
 use rand::Rng;
 
@@ -67,6 +68,7 @@ fn main() {
         .add_plugins(ModLoaderPlugin)
         .add_plugins(NoCameraPlayerPlugin)
         .add_systems(Update, modify_current_terrain)
+        .add_systems(Update, smooth_transform)
         .run();
 }
 
@@ -77,7 +79,7 @@ pub fn modify_current_terrain(
     mut voxel_engine: ResMut<AsyncChunkloader>,
     block_prototypes: Res<BlockPrototypes>,
 ) {
-    if !key.pressed(KeyCode::KeyN) {
+    /*if !key.pressed(KeyCode::KeyN) {
         return;
     }
     let camera_transform = query.single();
@@ -95,7 +97,7 @@ pub fn modify_current_terrain(
         );
         mods.push(ChunkModification(pos, block_prototypes.get("air").unwrap()));
     }
-    voxel_engine.chunk_modifications.insert(camera_chunk, mods);
+    voxel_engine.chunk_modifications.insert(camera_chunk, mods);*/
 }
 
 pub fn setup(

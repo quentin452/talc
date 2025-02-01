@@ -9,9 +9,11 @@ use std::collections::VecDeque;
 
 use bevy::{platform_support::collections::HashSet, prelude::*};
 
+use crate::chunky::async_chunkloader::Chunks;
+use crate::chunky::chunks_refs::ChunkRefs;
 use crate::{position::ChunkPosition, utils::index_to_ivec3_bounds};
 
-use crate::chunky::{chunk::CHUNK_SIZE_I32, constants::ADJACENT_CHUNK_DIRECTIONS, async_chunkloader::AsyncChunkloader};
+use crate::chunky::{chunk::CHUNK_SIZE_I32, async_chunkloader::AsyncChunkloader};
 
 pub const MAX_DATA_TASKS: usize = 9;
 pub const MAX_MESH_TASKS: usize = 3;
@@ -86,7 +88,7 @@ impl Scanner {
 /// on scanner chunk change, enqueue chunks to load/unload
 fn detect_move(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<AsyncChunkloader>,
+    mut chunkloader: ResMut<AsyncChunkloader>,
 ) {
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
@@ -142,23 +144,23 @@ fn detect_move(
         } = scanner.as_mut();
 
         for p in unresolved_mesh_unload.iter() {
-            if let Some((i, _)) = voxel_engine
+            if let Some((i, _)) = chunkloader
                 .load_mesh_queue
                 .iter()
                 .enumerate()
                 .find(|(_i, k)| *k == p)
             {
-                voxel_engine.load_mesh_queue.remove(i);
+                chunkloader.load_mesh_queue.remove(i);
             }
         }
         for p in unresolved_data_unload.iter() {
-            if let Some((i, _)) = voxel_engine
-                .load_data_queue
+            if let Some((i, _)) = chunkloader
+                .load_chunk_queue
                 .iter()
                 .enumerate()
                 .find(|(_i, k)| *k == p)
             {
-                voxel_engine.load_data_queue.remove(i);
+                chunkloader.load_chunk_queue.remove(i);
             }
         }
 
@@ -200,90 +202,105 @@ fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
     sampling_offsets
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn scan_data(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<AsyncChunkloader>,
+    mut chunkloader: ResMut<AsyncChunkloader>,
+    chunks: Res<Chunks>
 ) {
     for (mut scanner, _g_transform) in &mut scanners {
-        if voxel_engine.data_tasks.len() >= MAX_DATA_TASKS {
+        if chunkloader.worldgen_tasks.len() >= MAX_DATA_TASKS {
             return;
         }
         let l = scanner.unresolved_data_load.len();
         // for chunk_pos in scanner.unresolved_data_load.drain(..) {
         for chunk_pos in scanner.unresolved_data_load.drain(0..MAX_SCANS.min(l)) {
             // want to load chunk
-            let is_busy = voxel_engine.world_data.contains_key(&chunk_pos)
-                || voxel_engine.load_data_queue.contains(&chunk_pos)
-                || voxel_engine.data_tasks.contains_key(&chunk_pos);
+            let is_busy = chunks.0.contains_key(&chunk_pos)
+                || chunkloader.load_chunk_queue.contains(&chunk_pos)
+                || chunkloader.worldgen_tasks.contains_key(&chunk_pos);
             if !is_busy {
-                voxel_engine.load_data_queue.push(chunk_pos);
+                chunkloader.load_chunk_queue.push(chunk_pos);
                 // abort unload
-                let index_of_unloading = voxel_engine
-                    .unload_data_queue
+                let index_of_unloading = chunkloader
+                    .unload_chunk_queue
                     .iter()
                     .enumerate()
                     .find_map(|(i, pos)| if pos == &chunk_pos { Some(i) } else { None });
                 if let Some(i) = index_of_unloading {
-                    voxel_engine.unload_data_queue.remove(i);
+                    chunkloader.unload_chunk_queue.remove(i);
                 }
             }
         }
     }
 }
 
+
+#[allow(clippy::needless_pass_by_value)]
 pub fn scan_data_unload(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
-    mut voxel_engine: ResMut<AsyncChunkloader>,
+    mut chunkloader: ResMut<AsyncChunkloader>,
+    chunks: Res<Chunks>
 ) {
     // find all loaded and check if in range
     for (mut scanner, _g_transform) in &mut scanners {
         for chunk_pos in scanner.unresolved_data_unload.drain(..) {
             // want to load chunk
-            let is_busy = !voxel_engine.world_data.contains_key(&chunk_pos);
+            let is_busy = !chunks.0.contains_key(&chunk_pos);
             if !is_busy {
-                voxel_engine.unload_data_queue.push(chunk_pos);
+                chunkloader.unload_chunk_queue.push(chunk_pos);
             }
         }
     }
 }
 
-pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<AsyncChunkloader>) {
+pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut chunkloader: ResMut<AsyncChunkloader>) {
     // find all loaded and check if in range
     for mut scanner in &mut scanners {
         for chunk_pos in scanner.unresolved_mesh_unload.drain(..) {
-            voxel_engine.unload_mesh_queue.push(chunk_pos);
+            chunkloader.unload_mesh_queue.push(chunk_pos);
         }
     }
 }
 
-pub fn scan_mesh(mut scanners: Query<&mut Scanner>, mut voxel_engine: ResMut<AsyncChunkloader>) {
+#[allow(clippy::needless_pass_by_value)]
+pub fn scan_mesh(
+    mut scanners: Query<&mut Scanner>,
+    mut chunkloader: ResMut<AsyncChunkloader>,
+    chunks: Res<Chunks>
+) {
     for mut scanner in &mut scanners {
-        // if voxel_engine.data_tasks.len() >= MAX_MESH_TASKS {
+        // if chunkloader.worldgen_tasks.len() >= MAX_MESH_TASKS {
         //     return;
         // }
         let mut retries = Vec::new();
         let l = scanner.unresolved_mesh_load.len();
-        for chunk_pos in scanner.unresolved_mesh_load.drain(0..MAX_SCANS.min(l)) {
-            let mut busy = voxel_engine.load_mesh_queue.contains(&chunk_pos);
-            // all data available
-            busy |= !ADJACENT_CHUNK_DIRECTIONS
-                .iter()
-                .map(|of| chunk_pos + *of)
-                .all(|p| voxel_engine.world_data.contains_key(&p));
+        for chunk_position in scanner.unresolved_mesh_load.drain(0..MAX_SCANS.min(l)) {
+            let busy = chunkloader.load_mesh_queue.iter().any(|queued_chunk_refs| {
+                queued_chunk_refs.center_chunk_position == chunk_position
+            });
 
             if busy {
-                retries.push(chunk_pos);
-            } else {
-                voxel_engine.load_mesh_queue.push(chunk_pos);
-                // abort unload
-                let index_of_unloading = voxel_engine
-                    .unload_mesh_queue
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, pos)| if pos == &chunk_pos { Some(i) } else { None });
-                if let Some(i) = index_of_unloading {
-                    voxel_engine.unload_mesh_queue.remove(i);
-                }
+                continue;
+            }
+
+            // all 27 adjacent voxel datas are available. we are safe to start a mesh thread.
+            let Some(adjacent_chunks) = ChunkRefs::try_new(&chunks, chunk_position) else {
+                retries.push(chunk_position);
+                continue;
+            };
+
+            chunkloader.load_mesh_queue.push(adjacent_chunks);
+
+            // abort unload
+            let index_of_unloading = chunkloader
+                .unload_mesh_queue
+                .iter()
+                .enumerate()
+                .find_map(|(i, pos)| if pos == &chunk_position { Some(i) } else { None });
+
+            if let Some(i) = index_of_unloading {
+                chunkloader.unload_mesh_queue.remove(i);
             }
         }
         scanner.unresolved_mesh_load.append(&mut retries);

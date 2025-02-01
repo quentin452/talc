@@ -8,9 +8,7 @@ use crate::{
     position::{ChunkPosition, Position, RelativePosition},
 };
 
-#[derive(Component)]
-pub struct Chunk;
-
+/// 32^3 voxels per chunk is a great compromise as it allows each vertex to be only 32 bits when sent to wgsl.
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
 pub const CHUNK_SIZE_U16: u16 = CHUNK_SIZE as u16;
@@ -27,6 +25,61 @@ pub const CHUNK_SIZE3_I32: i32 = (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as i32;
 /// Chunks will "float up" this distance after generating.
 pub const CHUNK_INITIAL_Y_OFFSET: f32 = -64.;
 pub const CHUNK_FLOAT_UP_BLOCKS_PER_SECOND: f32 = 32.;
+
+#[derive(Component)]
+pub struct Chunk {
+    pub position: ChunkPosition
+}
+
+#[derive(Debug)]
+pub struct ChunkData {
+    pub position: ChunkPosition,
+    voxels: Voxels
+}
+
+#[derive(Clone, Debug)]
+enum Voxels {
+    Heterogeneous(Box<[ThinBlockPointer]>),
+    Homogeneous(ThinBlockPointer),
+}
+
+impl ChunkData {
+    #[inline]
+    #[must_use]
+    pub fn get_block(&self, index: VoxelIndex) -> &'static BlockPrototype {
+        match &self.voxels {
+            Voxels::Homogeneous(block_pointer) => access_block_registry(*block_pointer),
+            Voxels::Heterogeneous(voxels) => access_block_registry(voxels[index.i()]),
+        }
+        .expect("Invalid thin block pointer.")
+    }
+
+    pub fn set_block(&mut self, index: VoxelIndex, block_type: &'static BlockPrototype) {
+        match &mut self.voxels {
+            Voxels::Homogeneous(old_block_type) => {
+                let mut new_voxels: Box<[ThinBlockPointer]> =
+                    (0..CHUNK_SIZE3).map(|_| *old_block_type).collect();
+                new_voxels[index.i()] = block_type.id;
+                self.voxels = Voxels::Heterogeneous(new_voxels);
+            }
+            Voxels::Heterogeneous(voxels) => {
+                voxels[index.i()] = block_type.id;
+
+                let homogeneous = voxels.iter().all(|&block| block == block_type.id);
+                if homogeneous {
+                    todo!("woo hoo");
+                    //self.voxels = Voxels::Homogeneous(block_type);
+                }
+            }
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_homogenous(&self) -> bool {
+        matches!(self.voxels, Voxels::Homogeneous(_))
+    }
+}
 
 /// The index of a voxel within a chunk.
 /// Each chunk contains `chunk::CHUNK_SIZE3` voxels.
@@ -121,54 +174,7 @@ pub fn set_block_registry(block_prototypes: &BlockPrototypes) {
     });
 }
 
-#[derive(Clone, Debug)]
-enum Voxels {
-    Heterogeneous(Box<[ThinBlockPointer]>),
-    Homogeneous(ThinBlockPointer),
-}
-
-#[derive(Clone, Debug)]
-pub struct ChunkData {
-    voxels: Voxels,
-}
-
 impl ChunkData {
-    #[inline]
-    #[must_use]
-    pub fn get_block(&self, index: VoxelIndex) -> &'static BlockPrototype {
-        match &self.voxels {
-            Voxels::Homogeneous(block_pointer) => access_block_registry(*block_pointer),
-            Voxels::Heterogeneous(voxels) => access_block_registry(voxels[index.i()]),
-        }
-        .expect("Invalid thin block pointer.")
-    }
-
-    pub fn set_block(&mut self, index: VoxelIndex, block_type: &'static BlockPrototype) {
-        match &mut self.voxels {
-            Voxels::Homogeneous(old_block_type) => {
-                let mut new_voxels: Box<[ThinBlockPointer]> =
-                    (0..CHUNK_SIZE3).map(|_| *old_block_type).collect();
-                new_voxels[index.i()] = block_type.id;
-                self.voxels = Voxels::Heterogeneous(new_voxels);
-            }
-            Voxels::Heterogeneous(voxels) => {
-                voxels[index.i()] = block_type.id;
-
-                let homogeneous = voxels.iter().all(|&block| block == block_type.id);
-                if homogeneous {
-                    todo!("woo hoo");
-                    //self.voxels = Voxels::Homogeneous(block_type);
-                }
-            }
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_homogenous(&self) -> bool {
-        matches!(self.voxels, Voxels::Homogeneous(_))
-    }
-
     /// use noise shape our voxel data based on the `chunk_pos`
     #[must_use]
     pub fn generate(block_prototypes: &BlockPrototypes, chunk_position: ChunkPosition) -> Self {
@@ -176,12 +182,14 @@ impl ChunkData {
         if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap().id),
+                position: chunk_position
             };
         }
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap().id),
+                position: chunk_position
             };
         }
 
@@ -232,12 +240,14 @@ impl ChunkData {
             if homogeneous {
                 return Self {
                     voxels: Voxels::Homogeneous(first),
+                    position: chunk_position
                 };
             }
         }
 
         Self {
             voxels: Voxels::Heterogeneous(voxels),
+            position: chunk_position
         }
     }
 }

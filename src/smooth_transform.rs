@@ -12,7 +12,7 @@ pub struct SmoothTransformTo {
 
 impl SmoothTransformTo {
     #[must_use]
-    pub fn new(timer: &Res<Time>, end: FloatingPosition, blocks_per_second: f32) -> Self {
+    pub fn new(timer: &Time, end: FloatingPosition, blocks_per_second: f32) -> Self {
         Self {
             direction: end.0.normalize(),
             blocks_per_second,

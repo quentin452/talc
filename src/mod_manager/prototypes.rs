@@ -1,6 +1,8 @@
 //! This file contains data repersentations for all prototypes.
 //! It also facilitates converts from lua prototypes into rust.
 
+use std::collections::BTreeMap;
+
 use anyhow::Context;
 use bevy::color::Color;
 use bevy::platform_support::collections::HashMap;
@@ -35,11 +37,11 @@ pub(super) trait PrototypesBuilder {
 pub trait Prototypes {
     type T: Prototype;
     fn get(&self, name: &str) -> Option<&'static Self::T>;
-    fn iter(&self) -> Iter<'_, std::boxed::Box<str>, &'static Self::T>;
+    fn iter(&self) -> Iter<'_, &'static str, &'static Self::T>;
 }
 
 #[derive(Resource, Clone)]
-pub struct BlockPrototypes(HashMap<Box<str>, &'static BlockPrototype>);
+pub struct BlockPrototypes(BTreeMap<&'static str, &'static BlockPrototype>);
 
 impl Prototypes for BlockPrototypes {
     type T = BlockPrototype;
@@ -48,12 +50,12 @@ impl Prototypes for BlockPrototypes {
         self.0.get(name).map(|v| &**v)
     }
 
-    fn iter(&self) -> Iter<'_, std::boxed::Box<str>, &'static Self::T> {
+    fn iter(&self) -> Iter<'_, &'static str, &'static Self::T> {
         self.0.iter()
     }
 }
 
-pub(super) struct BlockPrototypesBuilder(usize, HashMap<Box<str>, &'static BlockPrototype>);
+pub(super) struct BlockPrototypesBuilder(usize, HashMap<&'static str, &'static BlockPrototype>);
 
 impl PrototypesBuilder for BlockPrototypesBuilder {
     type BuiltFrom = RawBlockPrototype;
@@ -75,7 +77,7 @@ impl PrototypesBuilder for BlockPrototypesBuilder {
         let name = prototype.name.clone();
         assert!(
             self.1
-                .insert(name.clone(), Box::leak(prototype.into()))
+                .insert(Box::leak(name.clone()), Box::leak(prototype.into()))
                 .is_none(),
             "Prototype {name} registered twice."
         );

@@ -1,8 +1,6 @@
 //! This file contains data repersentations for all prototypes.
 //! It also facilitates converts from lua prototypes into rust.
 
-use std::sync::Arc;
-
 use anyhow::Context;
 use bevy::color::Color;
 use bevy::platform_support::collections::HashMap;
@@ -41,7 +39,7 @@ pub trait Prototypes {
 }
 
 #[derive(Resource, Clone)]
-pub struct BlockPrototypes(Arc<HashMap<Box<str>, &'static BlockPrototype>>);
+pub struct BlockPrototypes(HashMap<Box<str>, &'static BlockPrototype>);
 
 impl Prototypes for BlockPrototypes {
     type T = BlockPrototype;
@@ -85,7 +83,7 @@ impl PrototypesBuilder for BlockPrototypesBuilder {
     }
 
     fn build(self) -> Self::Final {
-        BlockPrototypes(Arc::new(self.1))
+        BlockPrototypes(self.1)
     }
 }
 

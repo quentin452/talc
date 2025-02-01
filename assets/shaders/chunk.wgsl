@@ -116,11 +116,8 @@ fn fragment(input: VertexOutput) -> FragmentOutput {
         false,
         false,
     );
-#ifdef LOAD_PREPASS_NORMALS
-    pbr_input.N = prepass_utils::prepass_normal(input.clip_position, 0u);
-#else
+
     pbr_input.N = normalize(pbr_input.world_normal);
-#endif
 
     pbr_input.material.base_color = vec4<f32>(input.blend_color * input.ambient, 1.0);
 
@@ -128,14 +125,9 @@ fn fragment(input: VertexOutput) -> FragmentOutput {
     pbr_input.material.perceptual_roughness = chunk_material.perceptual_roughness;
     pbr_input.material.metallic = chunk_material.metallic;
 
-#ifdef PREPASS_PIPELINE
-    // in deferred mode we can't modify anything after that, as lighting is run in a separate fullscreen shader.
-    let out = deferred_output(in, pbr_input);
-#else
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-#endif
 
     return out;
 }

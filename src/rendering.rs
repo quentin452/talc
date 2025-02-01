@@ -112,14 +112,6 @@ impl Material for ChunkMaterial {
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
     }
-
-    fn prepass_vertex_shader() -> ShaderRef {
-        "shaders/chunk_prepass.wgsl".into()
-    }
-
-    fn prepass_fragment_shader() -> ShaderRef {
-        "shaders/chunk_prepass.wgsl".into()
-    }
 }
 
 // copy of chunk material pipeline but with wireframe
@@ -157,13 +149,5 @@ impl Material for ChunkMaterialWireframe {
         descriptor.primitive.polygon_mode = PolygonMode::Line;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
-    }
-
-    fn prepass_vertex_shader() -> ShaderRef {
-        "shaders/chunk_prepass.wgsl".into()
-    }
-
-    fn prepass_fragment_shader() -> ShaderRef {
-        "shaders/chunk_prepass.wgsl".into()
     }
 }

@@ -1,3 +1,2 @@
 avoid-breaking-exported-api = false
 excessive-nesting-threshold = 8
-too-many-lines-threshold = 200

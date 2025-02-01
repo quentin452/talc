@@ -32,78 +32,13 @@ fn add_voxel_to_axis_cols(
     }
 }
 
-#[must_use]
-pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
-    // early exit, if all faces are culled
-    if chunks_refs.is_all_voxels_same() {
-        return None;
-    }
-    let mut vertices: Vec<u32> = vec![];
-
-    // solid binary for each x,y,z axis (3)
-    #[allow(clippy::large_stack_arrays)]
-    let mut axis_cols = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 3];
-
+fn calculate_ao(
+    chunks_refs: &ChunkRefs,
+    axis_cols: &[[[u64; 34]; 34]; 3]
+) -> [HashMap<u32, HashMap<u32, [u32; CHUNK_SIZE]>>; 6] {
     // the cull mask to perform greedy slicing, based on solids on previous axis_cols
     #[allow(clippy::large_stack_arrays)]
     let mut col_face_masks = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 6];
-
-    // inner chunk voxels.
-    let chunk = &*chunks_refs.adjacent_chunks[ChunkRefs::vec3_to_chunk_index(IVec3::new(1, 1, 1))];
-
-    {
-        let mut x = 0;
-        let mut y = 0;
-        let mut z = 0;
-        for i in 0..CHUNK_SIZE3 {
-            add_voxel_to_axis_cols(
-                chunk.get_block(i.into()),
-                x + 1,
-                y + 1,
-                z + 1,
-                &mut axis_cols,
-            );
-
-            x += 1;
-            if x == CHUNK_SIZE {
-                y += 1;
-                x = 0;
-                if y == CHUNK_SIZE {
-                    z += 1;
-                    y = 0;
-                }
-            }
-        }
-    }
-
-    // neighbor chunk voxels.
-    // note(leddoo): couldn't be bothered to optimize these.
-    //  might be worth it though. together, they take
-    //  almost as long as the entire "inner chunk" loop.
-    for z in [0, CHUNK_SIZE_P - 1] {
-        for y in 0..CHUNK_SIZE_P {
-            for x in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
-                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
-            }
-        }
-    }
-    for z in 0..CHUNK_SIZE_P {
-        for y in [0, CHUNK_SIZE_P - 1] {
-            for x in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
-                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
-            }
-        }
-    }
-    for z in 0..CHUNK_SIZE_P {
-        for x in [0, CHUNK_SIZE_P - 1] {
-            for y in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
-                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
-            }
-        }
-    }
 
     // face culling
     for axis in 0..=2 {
@@ -192,7 +127,80 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
         }
     }
 
-    let mut extra_vertices = vec![];
+    data
+}
+
+#[must_use]
+pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
+    // early exit, if all faces are culled
+    if chunks_refs.is_all_voxels_same() {
+        return None;
+    }
+
+    // solid binary for each x,y,z axis (3)
+    #[allow(clippy::large_stack_arrays)]
+    let mut axis_cols = [[[0u64; CHUNK_SIZE_P]; CHUNK_SIZE_P]; 3];
+
+    // inner chunk voxels.
+    let chunk = &*chunks_refs.adjacent_chunks[ChunkRefs::vec3_to_chunk_index(IVec3::new(1, 1, 1))];
+
+    {
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        for i in 0..CHUNK_SIZE3 {
+            add_voxel_to_axis_cols(
+                chunk.get_block(i.into()),
+                x + 1,
+                y + 1,
+                z + 1,
+                &mut axis_cols,
+            );
+
+            x += 1;
+            if x == CHUNK_SIZE {
+                y += 1;
+                x = 0;
+                if y == CHUNK_SIZE {
+                    z += 1;
+                    y = 0;
+                }
+            }
+        }
+    }
+
+    // neighbor chunk voxels.
+    // note(leddoo): couldn't be bothered to optimize these.
+    //  might be worth it though. together, they take
+    //  almost as long as the entire "inner chunk" loop.
+    for z in [0, CHUNK_SIZE_P - 1] {
+        for y in 0..CHUNK_SIZE_P {
+            for x in 0..CHUNK_SIZE_P {
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
+            }
+        }
+    }
+    for z in 0..CHUNK_SIZE_P {
+        for y in [0, CHUNK_SIZE_P - 1] {
+            for x in 0..CHUNK_SIZE_P {
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
+            }
+        }
+    }
+    for z in 0..CHUNK_SIZE_P {
+        for x in [0, CHUNK_SIZE_P - 1] {
+            for y in 0..CHUNK_SIZE_P {
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
+            }
+        }
+    }
+
+    let data = calculate_ao(chunks_refs, &axis_cols);
+
+    let mut vertices: Vec<u32> = vec![];
     for (axis, block_ao_data) in data.into_iter().enumerate() {
         let facedir = match axis {
             0 => FaceDir::Down,
@@ -210,7 +218,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
 
                 for q in quads_from_axis {
                     q.append_vertices(
-                        &mut extra_vertices,
+                        &mut vertices,
                         facedir,
                         axis_pos,
                         Lod::default(),
@@ -221,7 +229,6 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
             }
         }
     }
-    vertices.extend(extra_vertices);
     
     if vertices.is_empty() {
         return None;

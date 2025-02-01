@@ -1,12 +1,11 @@
 //! This file contains data repersentations for all prototypes.
 //! It also facilitates converts from lua prototypes into rust.
 
+use std::collections::btree_map::Iter;
 use std::collections::BTreeMap;
 
 use anyhow::Context;
 use bevy::color::Color;
-use bevy::platform_support::collections::HashMap;
-use bevy::platform_support::collections::hash_map::Iter;
 use bevy::prelude::*;
 use mlua::FromLua;
 
@@ -55,14 +54,14 @@ impl Prototypes for BlockPrototypes {
     }
 }
 
-pub(super) struct BlockPrototypesBuilder(usize, HashMap<&'static str, &'static BlockPrototype>);
+pub(super) struct BlockPrototypesBuilder(usize, BTreeMap<&'static str, &'static BlockPrototype>);
 
 impl PrototypesBuilder for BlockPrototypesBuilder {
     type BuiltFrom = RawBlockPrototype;
     type Final = BlockPrototypes;
 
     fn new() -> Self {
-        Self(0, HashMap::default())
+        Self(0, BTreeMap::default())
     }
 
     fn add(&mut self, prototype: Self::BuiltFrom) {

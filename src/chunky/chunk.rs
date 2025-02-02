@@ -200,25 +200,20 @@ impl ChunkData {
         let mut y = 0;
         let mut z = 0;
 
+        let air = block_prototypes.get("air").unwrap();
+        let grass = block_prototypes.get("grass").unwrap();
+
         let voxels: Box<[ThinBlockPointer; CHUNK_SIZE3]> = std::array::from_fn(|_| {
             let wx = (x + world_position.x()) as f32;
-            let wy = (y + world_position.y()) as f32 - 200.;
+            let mut wy = (y + world_position.y()) as f32 - 200.;
             let wz = (z + world_position.z()) as f32;
 
-            let scale = 1.0;
-            fast_noise.set_frequency(0.0254);
-            let overhang = fast_noise.get_noise3d(wx * scale, wy, wz * scale) * 55.0;
-            fast_noise.set_frequency(0.002591);
-            let noise_2 = fast_noise.get_noise(wx + overhang, wz * scale);
-            let h = noise_2 * 30.0;
-            let solid = h > wy;
+            wy += (f32::sin(wx / 100.) + f32::cos(wz / 100.)) * 30.;
 
-            let block_type = if !solid {
-                block_prototypes.get("air").unwrap()
-            } else if (h - wy) > 1.0 {
-                block_prototypes.get("dirt").unwrap()
+            let block_type = if wy > 0.0 {
+                air
             } else {
-                block_prototypes.get("grass").unwrap()
+                grass
             };
 
             x += 1;

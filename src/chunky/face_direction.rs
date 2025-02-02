@@ -1,3 +1,5 @@
+use crate::position::RelativePosition;
+
 use super::lod::Lod;
 use bevy::math::{IVec3, ivec3};
 
@@ -41,15 +43,15 @@ impl FaceDir {
 
     /// offset input position with this face direction
     #[must_use]
-    pub const fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> IVec3 {
-        match self {
-            Self::Up => ivec3(x, axis + 1, y),
+    pub const fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> RelativePosition {
+        RelativePosition(match self {
+            Self::Up => ivec3(x, axis, y),
             Self::Down => ivec3(x, axis, y),
             Self::Left => ivec3(axis, y, x),
-            Self::Right => ivec3(axis + 1, y, x),
+            Self::Right => ivec3(axis, y, x),
             Self::Forward => ivec3(x, y, axis),
-            Self::Back => ivec3(x, y, axis + 1),
-        }
+            Self::Back => ivec3(x, y, axis),
+        })
     }
 
     /// returns true if vertices should be reverse.

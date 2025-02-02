@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use bevy::{ecs::query::QueryData, prelude::*};
+use bevy::prelude::*;
 use bracket_noise::prelude::*;
 
 use crate::{
@@ -210,11 +210,7 @@ impl ChunkData {
 
             wy += (f32::sin(wx / 100.) + f32::cos(wz / 100.)) * 30.;
 
-            let block_type = if wy > 0.0 {
-                air
-            } else {
-                grass
-            };
+            let block_type = if wy > 0.0 { air } else { grass };
 
             x += 1;
             if x == CHUNK_SIZE_I32 {

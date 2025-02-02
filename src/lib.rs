@@ -1,3 +1,5 @@
+#![feature(stmt_expr_attributes)]
+
 pub mod chunky;
 pub mod mod_manager;
 pub mod player;

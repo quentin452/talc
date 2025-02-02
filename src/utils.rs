@@ -50,27 +50,6 @@ pub fn get_edging_chunk(pos: RelativePosition) -> Option<ChunkPosition> {
     }
 }
 
-// pos 18 bits, ao 3 bits, normal 4 bits
-// 18-21-25-   left 32-25 = 7
-#[inline]
-#[must_use]
-pub const fn make_vertex_u32(
-    // position: [i32; 3], /*, normal: i32, color: Color, texture_id: u32*/
-    pos: IVec3, /*, normal: i32, color: Color, texture_id: u32*/
-    ao: u32,
-    normal: u32,
-    block_type: u32,
-) -> u32 {
-    pos.x as u32
-        | ((pos.y as u32) << 6u32)
-        | ((pos.z as u32) << 12u32)
-        | (ao << 18u32)
-        | (normal << 21u32)
-        | (block_type << 25u32)
-    // | (normal as u32) << 18u32
-    // | (texture_id) << 21u32
-}
-
 /// generate a vec of indices
 /// assumes vertices are made of quads, and counter clockwise ordered
 #[inline]

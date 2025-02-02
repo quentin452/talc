@@ -15,12 +15,13 @@ use bevy::{
     },
     prelude::*,
     render::{
+        view::{self, ExtractedView, RenderVisibleEntities, ViewTarget, VisibilityClass},
         extract_component::{ExtractComponent, ExtractComponentPlugin}, mesh::{
             allocator::MeshAllocator, MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, RenderMeshBufferInfo
         }, render_asset::RenderAssets, render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
             RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-        }, render_resource::*, renderer::RenderDevice, sync_world::MainEntity, view::{ExtractedView, ViewTarget}, Render, RenderApp, RenderSet
+        }, render_resource::*, renderer::RenderDevice, Render, RenderApp, RenderSet
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -30,12 +31,17 @@ use crate::position::ChunkPosition;
 /// This example uses a shader source file from the assets subdirectory
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
-/// A marker component that represents a chunk that is to be rendered using
+
+/// A marker component that represents an entity that is to be rendered using
 /// our specialized pipeline.
 ///
-/// Note the [`ExtractComponent`] trait implementation. This is necessary to
-/// tell Bevy that this object should be pulled into the render world.
-#[derive(Component, Clone, ExtractComponent)]
+/// Note the [`ExtractComponent`] trait implementation: this is necessary to
+/// tell Bevy that this object should be pulled into the render world. Also note
+/// the `on_add` hook, which is needed to tell Bevy's `check_visibility` system
+/// that entities with this component need to be examined for visibility.
+#[derive(Clone, Component, ExtractComponent)]
+#[require(VisibilityClass)]
+#[component(on_add = view::add_visibility_class::<ChunkMaterial>)]
 pub struct ChunkMaterial {
     pub instance_data: Vec<ChunkInstanceData>,
     pub chunk_position: ChunkPosition
@@ -154,9 +160,8 @@ fn queue_custom_mesh_pipeline(
     pipeline_cache: Res<PipelineCache>,
     meshes: Res<RenderAssets<RenderMesh>>,
     render_mesh_instances: Res<RenderMeshInstances>,
-    material_meshes: Query<(Entity, &MainEntity), With<ChunkMaterial>>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
-    views: Query<(&ExtractedView, &Msaa)>,
+    views: Query<(&RenderVisibleEntities, &ExtractedView, &Msaa)>,
 ) {
     // Get the id for our custom draw function
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
@@ -164,7 +169,7 @@ fn queue_custom_mesh_pipeline(
     // Render phases are per-view, so we need to iterate over all views so that
     // the entity appears in them. (In this example, we have only one view, but
     // it's good practice to loop over all views anyway.)
-    for (view, msaa) in views.iter() {
+    for (view_visible_entities, view, msaa) in views.iter() {
         let Some(transparent_phase) = transparent_render_phases.get_mut(&view.retained_view_entity)
         else {
             continue;
@@ -175,9 +180,9 @@ fn queue_custom_mesh_pipeline(
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
-        for (entity, main_entity) in &material_meshes {
+        for &(render_entity, visible_entity) in view_visible_entities.get::<ChunkMaterial>().iter() {
             // Get the mesh instance
-            let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(*main_entity)
+            let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(visible_entity)
             else {
                 continue;
             };
@@ -202,7 +207,7 @@ fn queue_custom_mesh_pipeline(
 
             // Add the mesh with our specialized pipeline
             transparent_phase.add(Transparent3d {
-                entity: (entity, *main_entity),
+                entity: (render_entity, visible_entity),
                 pipeline,
                 draw_function: draw_custom,
                 distance: rangefinder.distance_translation(&mesh_instance.translation),

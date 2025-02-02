@@ -13,7 +13,7 @@ use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;
 use crate::{position::ChunkPosition, utils::index_to_ivec3_bounds};
 
-use crate::chunky::{chunk::CHUNK_SIZE_I32, async_chunkloader::AsyncChunkloader};
+use crate::chunky::{async_chunkloader::AsyncChunkloader, chunk::CHUNK_SIZE_I32};
 
 pub const MAX_DATA_TASKS: usize = 9;
 pub const MAX_MESH_TASKS: usize = 3;
@@ -206,7 +206,7 @@ fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
 pub fn scan_data(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut chunkloader: ResMut<AsyncChunkloader>,
-    chunks: Res<Chunks>
+    chunks: Res<Chunks>,
 ) {
     for (mut scanner, _g_transform) in &mut scanners {
         if chunkloader.worldgen_tasks.len() >= MAX_DATA_TASKS {
@@ -235,12 +235,11 @@ pub fn scan_data(
     }
 }
 
-
 #[allow(clippy::needless_pass_by_value)]
 pub fn scan_data_unload(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut chunkloader: ResMut<AsyncChunkloader>,
-    chunks: Res<Chunks>
+    chunks: Res<Chunks>,
 ) {
     // find all loaded and check if in range
     for (mut scanner, _g_transform) in &mut scanners {
@@ -254,7 +253,10 @@ pub fn scan_data_unload(
     }
 }
 
-pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut chunkloader: ResMut<AsyncChunkloader>) {
+pub fn scan_mesh_unload(
+    mut scanners: Query<&mut Scanner>,
+    mut chunkloader: ResMut<AsyncChunkloader>,
+) {
     // find all loaded and check if in range
     for mut scanner in &mut scanners {
         for chunk_pos in scanner.unresolved_mesh_unload.drain(..) {
@@ -267,7 +269,7 @@ pub fn scan_mesh_unload(mut scanners: Query<&mut Scanner>, mut chunkloader: ResM
 pub fn scan_mesh(
     mut scanners: Query<&mut Scanner>,
     mut chunkloader: ResMut<AsyncChunkloader>,
-    chunks: Res<Chunks>
+    chunks: Res<Chunks>,
 ) {
     for mut scanner in &mut scanners {
         // if chunkloader.worldgen_tasks.len() >= MAX_MESH_TASKS {
@@ -276,9 +278,10 @@ pub fn scan_mesh(
         let mut retries = Vec::new();
         let l = scanner.unresolved_mesh_load.len();
         for chunk_position in scanner.unresolved_mesh_load.drain(0..MAX_SCANS.min(l)) {
-            let busy = chunkloader.load_mesh_queue.iter().any(|queued_chunk_refs| {
-                queued_chunk_refs.center_chunk_position == chunk_position
-            });
+            let busy = chunkloader
+                .load_mesh_queue
+                .iter()
+                .any(|queued_chunk_refs| queued_chunk_refs.center_chunk_position == chunk_position);
 
             if busy {
                 continue;
@@ -293,11 +296,18 @@ pub fn scan_mesh(
             chunkloader.load_mesh_queue.push(adjacent_chunks);
 
             // abort unload
-            let index_of_unloading = chunkloader
-                .unload_mesh_queue
-                .iter()
-                .enumerate()
-                .find_map(|(i, pos)| if pos == &chunk_position { Some(i) } else { None });
+            let index_of_unloading =
+                chunkloader
+                    .unload_mesh_queue
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, pos)| {
+                        if pos == &chunk_position {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    });
 
             if let Some(i) = index_of_unloading {
                 chunkloader.unload_mesh_queue.remove(i);

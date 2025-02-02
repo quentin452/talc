@@ -1,8 +1,8 @@
 //! This file contains data repersentations for all prototypes.
 //! It also facilitates converts from lua prototypes into rust.
 
-use std::collections::btree_map::Iter;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Iter;
 
 use anyhow::Context;
 use bevy::color::Color;

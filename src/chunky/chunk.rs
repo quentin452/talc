@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use bevy::prelude::*;
+use bevy::{ecs::query::QueryData, prelude::*};
 use bracket_noise::prelude::*;
 
 use crate::{
@@ -28,13 +28,13 @@ pub const CHUNK_FLOAT_UP_BLOCKS_PER_SECOND: f32 = 32.;
 
 #[derive(Component)]
 pub struct Chunk {
-    pub position: ChunkPosition
+    pub position: ChunkPosition,
 }
 
 #[derive(Debug)]
 pub struct ChunkData {
     pub position: ChunkPosition,
-    voxels: Voxels
+    voxels: Voxels,
 }
 
 #[derive(Clone, Debug)]
@@ -182,14 +182,14 @@ impl ChunkData {
         if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap().id),
-                position: chunk_position
+                position: chunk_position,
             };
         }
         // hardcoded extremity check
         if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap().id),
-                position: chunk_position
+                position: chunk_position,
             };
         }
 
@@ -240,14 +240,14 @@ impl ChunkData {
             if homogeneous {
                 return Self {
                     voxels: Voxels::Homogeneous(first),
-                    position: chunk_position
+                    position: chunk_position,
                 };
             }
         }
 
         Self {
             voxels: Voxels::Heterogeneous(voxels),
-            position: chunk_position
+            position: chunk_position,
         }
     }
 }

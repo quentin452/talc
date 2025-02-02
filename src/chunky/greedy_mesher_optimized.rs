@@ -1,16 +1,24 @@
 use std::collections::VecDeque;
 
-use bevy::{asset::RenderAssetUsages, platform_support::collections::HashMap, prelude::*, render::mesh::{Indices, PrimitiveTopology}};
+use bevy::{
+    asset::RenderAssetUsages,
+    platform_support::collections::HashMap,
+    prelude::*,
+    render::mesh::{Indices, PrimitiveTopology},
+};
 
 use crate::{
-    mod_manager::prototypes::BlockPrototype, position::RelativePosition, rendering::ATTRIBUTE_VOXEL, utils::{generate_indices, make_vertex_u32}
+    mod_manager::prototypes::BlockPrototype,
+    position::RelativePosition,
+    render::chunk_material::ATTRIBUTE_VOXEL,
+    utils::{generate_indices, make_vertex_u32},
 };
 
 use super::{
-    face_direction::FaceDir,
     chunk::{CHUNK_SIZE, CHUNK_SIZE_P, CHUNK_SIZE3},
     chunks_refs::ChunkRefs,
     constants::ADJACENT_AO_DIRS,
+    face_direction::FaceDir,
     lod::Lod,
 };
 
@@ -34,7 +42,7 @@ fn add_voxel_to_axis_cols(
 
 fn calculate_ao(
     chunks_refs: &ChunkRefs,
-    axis_cols: &[[[u64; 34]; 34]; 3]
+    axis_cols: &[[[u64; 34]; 34]; 3],
 ) -> [HashMap<u32, HashMap<u32, [u32; CHUNK_SIZE]>>; 6] {
     // the cull mask to perform greedy slicing, based on solids on previous axis_cols
     #[allow(clippy::large_stack_arrays)]
@@ -229,7 +237,7 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
             }
         }
     }
-    
+
     if vertices.is_empty() {
         return None;
     }

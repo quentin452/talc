@@ -11,31 +11,15 @@ use bevy::{
     },
 };
 
+use talc::mod_manager::mod_loader::ModLoaderPlugin;
 use talc::player::{
     debug_camera::{FlyCam, NoCameraPlayerPlugin},
     render_distance::Scanner,
     render_distance::ScannerPlugin,
 };
-use talc::{
-    chunky::chunk::{CHUNK_SIZE_I32, CHUNK_SIZE2},
-    mod_manager::{
-        mod_loader::ModLoaderPlugin,
-        prototypes::{BlockPrototypes, Prototypes},
-    },
-    position::FloatingPosition,
-    rendering::{
-        ChunkMaterial, ChunkMaterialWireframe, GlobalChunkMaterial, GlobalChunkWireframeMaterial,
-        RenderingPlugin,
-    },
-};
-use talc::{
-    position::RelativePosition,
-    sun::SunPlugin,
-    chunky::async_chunkloader::{AsyncChunkloader, AsyncChunkloaderPlugin},
-};
+use talc::render::chunk_material::CustomChunkMaterialPlugin;
 use talc::smooth_transform::smooth_transform;
-
-use rand::Rng;
+use talc::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
 
 fn main() {
     App::new()
@@ -64,46 +48,15 @@ fn main() {
         .add_plugins(SunPlugin)
         .add_plugins(ScannerPlugin)
         .add_systems(Startup, setup)
-        .add_plugins(RenderingPlugin)
         .add_plugins(ModLoaderPlugin)
         .add_plugins(NoCameraPlayerPlugin)
-        .add_systems(Update, modify_current_terrain)
         .add_systems(Update, smooth_transform)
+        .add_plugins(CustomChunkMaterialPlugin)
         .run();
-}
-
-#[allow(clippy::needless_pass_by_value)]
-pub fn modify_current_terrain(
-    query: Query<&Transform, With<Camera>>,
-    key: Res<ButtonInput<KeyCode>>,
-    mut voxel_engine: ResMut<AsyncChunkloader>,
-    block_prototypes: Res<BlockPrototypes>,
-) {
-    /*if !key.pressed(KeyCode::KeyN) {
-        return;
-    }
-    let camera_transform = query.single();
-    let looking_at_position = camera_transform.translation + (camera_transform.forward() * 64.0);
-    let looking_at_position = FloatingPosition(looking_at_position);
-    let camera_chunk = looking_at_position.into();
-
-    let mut rng = rand::rng();
-    let mut mods = vec![];
-    for _ in 0..CHUNK_SIZE2 {
-        let pos = RelativePosition::new(
-            rng.random_range(0..CHUNK_SIZE_I32),
-            rng.random_range(0..CHUNK_SIZE_I32),
-            rng.random_range(0..CHUNK_SIZE_I32),
-        );
-        mods.push(ChunkModification(pos, block_prototypes.get("air").unwrap()));
-    }
-    voxel_engine.chunk_modifications.insert(camera_chunk, mods);*/
 }
 
 pub fn setup(
     mut commands: Commands,
-    mut chunk_materials: ResMut<Assets<ChunkMaterial>>,
-    mut chunk_materials_wireframe: ResMut<Assets<ChunkMaterialWireframe>>,
     #[allow(unused)] mut materials: ResMut<Assets<StandardMaterial>>,
     #[allow(unused)] mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -150,18 +103,4 @@ pub fn setup(
             Bloom::NATURAL,
         ))
         .insert(FlyCam);
-
-    commands.insert_resource(GlobalChunkMaterial(chunk_materials.add(ChunkMaterial {
-        reflectance: 0.5,
-        perceptual_roughness: 1.0,
-        metallic: 0.01,
-    })));
-
-    commands.insert_resource(GlobalChunkWireframeMaterial(chunk_materials_wireframe.add(
-        ChunkMaterialWireframe {
-            reflectance: 0.5,
-            perceptual_roughness: 1.0,
-            metallic: 0.01,
-        },
-    )));
 }

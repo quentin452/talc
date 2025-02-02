@@ -10,19 +10,10 @@
 
 #import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip, mesh_normal_local_to_world}
 #import bevy_pbr::pbr_functions::{calculate_view, prepare_world_normal}
-#import bevy_pbr::mesh_view_bindings
 #import bevy_pbr::mesh_bindings
 #import bevy_pbr::mesh_bindings::mesh
 #import bevy_pbr::pbr_types::pbr_input_new
-#import bevy_pbr::prepass_utils
-
-struct ChunkMaterial {
-    reflectance: f32,
-    perceptual_roughness: f32,
-    metallic: f32,
-};
-
-@group(2) @binding(0) var<uniform> chunk_material: ChunkMaterial;
+#import bevy_pbr::view_transformations::position_world_to_clip
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -51,9 +42,12 @@ var<private> normals: array<vec3<f32>,6> = array<vec3<f32>,6> (
 	vec3<f32>(0.0, 0.0, 1.0) // Back
 );
 
-fn x_positive_bits(bits: u32) -> u32{
+fn x_positive_bits(bits: u32) -> u32 {
     return (1u << bits) - 1u;
 }
+
+@group(2) @binding(0)
+var<uniform> chunk_position: vec3<i32>;
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
@@ -67,11 +61,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     //let block_index = vertex.vert_data >> 25u & x_positive_bits(7u);
 
     let local_position = vec4<f32>(x,y,z, 1.0);
-    let world_position = get_world_from_local(vertex.instance_index) * local_position;
-    out.clip_position = mesh_position_local_to_clip(
-        get_world_from_local(vertex.instance_index),
-        local_position,
-    );
+    let world_position = vec4<f32>(f32(chunk_position.x * 32), f32(chunk_position.y * 32), f32(chunk_position.z * 32), 1.0);
+    out.clip_position = position_world_to_clip(world_position.xyz + local_position.xyz);
 
     let ambient_lerp = ambient_lerps[ao];
     out.ambient = ambient_lerp;
@@ -114,9 +105,9 @@ fn fragment(input: VertexOutput) -> FragmentOutput {
 
     pbr_input.material.base_color = vec4<f32>(input.blend_color * input.ambient, 1.0);
 
-    pbr_input.material.reflectance = vec3<f32>(chunk_material.reflectance, chunk_material.reflectance, chunk_material.reflectance);
-    pbr_input.material.perceptual_roughness = chunk_material.perceptual_roughness;
-    pbr_input.material.metallic = chunk_material.metallic;
+    pbr_input.material.reflectance = vec3<f32>(0.5, 0.5, 0.5);
+    pbr_input.material.perceptual_roughness = 1.0;
+    pbr_input.material.metallic = 0.1;
 
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);

@@ -1,18 +1,22 @@
 use std::{sync::Arc, vec::Drain};
 
 use bevy::{
-    math::VectorSpace, platform_support::collections::HashMap, prelude::*, render::primitives::Aabb, tasks::{block_on, AsyncComputeTaskPool, Task}
+    math::VectorSpace,
+    platform_support::collections::HashMap,
+    prelude::*,
+    render::primitives::Aabb,
+    tasks::{AsyncComputeTaskPool, Task, block_on},
 };
 
-use crate::{chunky::{chunk::{
-    ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32
-}, lod::Lod}, rendering::{ChunkMaterial, GlobalChunkMaterial}};
+use crate::{chunky::{
+    chunk::{
+        ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32
+    },
+    lod::Lod,
+}, render::chunk_material::{ChunkMaterial, RenderableChunk}};
 use crate::mod_manager::prototypes::BlockPrototypes;
 use crate::position::{ChunkPosition, FloatingPosition};
-use crate::{
-    player::render_distance::Scanner,
-    smooth_transform::SmoothTransformTo,
-};
+use crate::{player::render_distance::Scanner, smooth_transform::SmoothTransformTo};
 use futures_lite::future;
 
 use super::{chunk::Chunk, chunks_refs::ChunkRefs, greedy_mesher_optimized};
@@ -24,7 +28,7 @@ impl Plugin for AsyncChunkloaderPlugin {
             Lod::default().size() == CHUNK_SIZE_I32,
             "Default LOD must exactly equal the chunk size."
         );
-        
+
         app.add_systems(Update, start_worldgen_threads);
         app.add_systems(Update, join_worldgen_threads);
         app.add_systems(Update, start_mesh_threads);
@@ -53,7 +57,10 @@ pub struct AsyncChunkloader {
 }
 
 impl AsyncChunkloader {
-    fn get_chunks_to_load(&mut self, player_position: FloatingPosition) -> Drain<'_, ChunkPosition> {
+    fn get_chunks_to_load(
+        &mut self,
+        player_position: FloatingPosition,
+    ) -> Drain<'_, ChunkPosition> {
         let player_chunk_position: ChunkPosition = player_position.into();
 
         let tasks_left = (MAX_WORLDGEN_TASKS as i32 - self.worldgen_tasks.len() as i32)
@@ -63,7 +70,7 @@ impl AsyncChunkloader {
         self.load_chunk_queue.sort_by(|a, b| {
             a.0.distance_squared(player_chunk_position.0)
                 .cmp(&b.0.distance_squared(player_chunk_position.0))
-            });
+        });
 
         self.load_chunk_queue.drain(0..tasks_left)
     }
@@ -80,8 +87,14 @@ impl AsyncChunkloader {
             .max(0) as usize;
 
         self.load_mesh_queue.sort_by(|a, b| {
-            a.center_chunk_position.0.distance_squared(player_chunk_position.0)
-                .cmp(&b.center_chunk_position.0.distance_squared(player_chunk_position.0))
+            a.center_chunk_position
+                .0
+                .distance_squared(player_chunk_position.0)
+                .cmp(
+                    &b.center_chunk_position
+                        .0
+                        .distance_squared(player_chunk_position.0),
+                )
         });
 
         self.load_mesh_queue.drain(0..tasks_left)
@@ -97,34 +110,32 @@ fn spawn_chunk_as_bevy_entity(
     chunk_entities: &mut Chunks,
     timer: &Time,
     commands: &mut Commands,
-    global_chunk_material: &Handle<ChunkMaterial>
 ) {
     let chunk_position = chunk_data.position;
     /*if let Some(entity) = chunk_entities.0.get(&chunk_position) {
         commands.entity(*entity).despawn();
     }*/
 
-    commands
-        .spawn((
-            Chunk { position: chunk_position },
-            SmoothTransformTo::new(
-                timer,
-                FloatingPosition::new(0., -CHUNK_INITIAL_Y_OFFSET, 0.),
-                CHUNK_FLOAT_UP_BLOCKS_PER_SECOND,
-            ),
-            Aabb::from_min_max(
-                Vec3::ZERO,
-                Vec3::splat(CHUNK_SIZE_F32)
-            ),
-            MeshMaterial3d(global_chunk_material.clone()),
-            Transform::from_translation(
-                (FloatingPosition::from(chunk_position)
-                    + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.))
-                .0,
-            ),
-        ));
+    commands.spawn((
+        Chunk {
+            position: chunk_position,
+        },
+        SmoothTransformTo::new(
+            timer,
+            FloatingPosition::new(0., -CHUNK_INITIAL_Y_OFFSET, 0.),
+            CHUNK_FLOAT_UP_BLOCKS_PER_SECOND,
+        ),
+        Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
+        Transform::from_translation(
+            (FloatingPosition::from(chunk_position)
+                + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.))
+            .0,
+        ),
+    ));
 
-    chunk_entities.0.insert(chunk_position, Arc::new(chunk_data));
+    chunk_entities
+        .0
+        .insert(chunk_position, Arc::new(chunk_data));
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -140,9 +151,7 @@ fn start_worldgen_threads(
     let to_load: Vec<ChunkPosition> = chunkloader.get_chunks_to_load(player_position).collect();
     for chunk_position in to_load {
         let prototypes = block_prototypes.clone();
-        let task = task_pool.spawn(async move {
-            ChunkData::generate(&prototypes, chunk_position)
-        });
+        let task = task_pool.spawn(async move { ChunkData::generate(&prototypes, chunk_position) });
         chunkloader.worldgen_tasks.insert(chunk_position, task);
     }
 }
@@ -153,7 +162,6 @@ fn join_worldgen_threads(
     mut chunk_entities: ResMut<Chunks>,
     timer: Res<Time>,
     mut commands: Commands,
-    global_chunk_material: Res<GlobalChunkMaterial>
 ) {
     chunkloader.worldgen_tasks.retain(|_, task| {
         // check on our worldgen task to see how it's doing :)
@@ -164,13 +172,7 @@ fn join_worldgen_threads(
 
         // if this task is done, handle the data it returned!
         if let Some(chunk_component) = status {
-            spawn_chunk_as_bevy_entity(
-                chunk_component,
-                &mut chunk_entities,
-                &timer,
-                &mut commands,
-                &global_chunk_material.0
-            );
+            spawn_chunk_as_bevy_entity(chunk_component, &mut chunk_entities, &timer, &mut commands);
         }
 
         retain
@@ -220,7 +222,13 @@ fn join_mesh_threads(
             for (entity_id, chunk) in chunk_canididates.iter() {
                 if chunk.position == *chunk_position {
                     if let Some(mut entity_commands) = commands.get_entity(entity_id) {
-                        entity_commands.insert(mesh_handle);
+                        entity_commands.insert(RenderableChunk{
+                            mesh: mesh_handle,
+                            chunk_material: ChunkMaterial{
+                                instance_data: vec![],
+                                chunk_position: *chunk_position
+                            }
+                        });
                         break;
                     }
                 }

@@ -4,18 +4,22 @@ use bevy::prelude::*;
 
 use crate::{
     mod_manager::prototypes::BlockPrototype,
-    position::{ChunkPosition, RelativePosition}, utils::index_to_ivec3_bounds,
+    position::{ChunkPosition, RelativePosition},
+    utils::index_to_ivec3_bounds,
 };
 
 use super::{
-    async_chunkloader::Chunks, chunk::{ChunkData, VoxelIndex, CHUNK_SIZE, CHUNK_SIZE_I32}, constants::ADJACENT_CHUNK_DIRECTIONS, quad::Direction
+    async_chunkloader::Chunks,
+    chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
+    constants::ADJACENT_CHUNK_DIRECTIONS,
+    quad::Direction,
 };
 
 // Pointers to chunk data, repersented as the middle one with all their neighbours in 3x3x3 cube.
 #[derive(Clone)]
 pub struct ChunkRefs {
     pub adjacent_chunks: [Arc<ChunkData>; 27],
-    pub center_chunk_position: ChunkPosition
+    pub center_chunk_position: ChunkPosition,
 }
 
 impl ChunkRefs {
@@ -23,10 +27,7 @@ impl ChunkRefs {
     /// # Panics
     /// if `ChunkData` doesn't exist in input `world_data`
     #[must_use]
-    pub fn try_new(
-        chunks: &Chunks,
-        center_chunk_position: ChunkPosition,
-    ) -> Option<Self> {
+    pub fn try_new(chunks: &Chunks, center_chunk_position: ChunkPosition) -> Option<Self> {
         let get_chunk = |i| {
             //let offset = ADJACENT_CHUNK_DIRECTIONS[i] + IVec3::NEG_ONE;
             let offset = ChunkPosition(index_to_ivec3_bounds(i, 3) + IVec3::NEG_ONE);
@@ -46,7 +47,10 @@ impl ChunkRefs {
           get_chunk(21)?.clone(), get_chunk(22)?.clone(), get_chunk(23)?.clone(),
           get_chunk(24)?.clone(), get_chunk(25)?.clone(), get_chunk(26)?.clone(),
         ];
-        Some(Self { adjacent_chunks, center_chunk_position })
+        Some(Self {
+            adjacent_chunks,
+            center_chunk_position,
+        })
     }
 
     #[must_use]

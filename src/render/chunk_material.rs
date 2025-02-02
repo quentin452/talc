@@ -313,7 +313,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                 front_face: FrontFace::Ccw,
                 cull_mode: Some(Face::Back),
                 polygon_mode: PolygonMode::Fill,
-                conservative: true, // Enabling this requires `Features::CONSERVATIVE_RASTERIZATION` to be enabled.
+                conservative: false, // Enabling this requires `Features::CONSERVATIVE_RASTERIZATION` to be enabled.
                 ..default()
             },
             // Note that if your view has no depth buffer this will need to be

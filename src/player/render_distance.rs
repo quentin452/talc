@@ -40,12 +40,6 @@ impl Plugin for ScannerPlugin {
 #[derive(Component)]
 pub struct Scanner {
     pub prev_chunk_pos: ChunkPosition,
-    /// how many chunks we visit
-    pub checks_per_frame: usize,
-    /// offset grid sampling over frames
-    pub data_offset: usize,
-    /// offset grid sampling over frames
-    pub mesh_offset: usize,
 
     // chunk positions we are yet to check we need need to load
     pub unresolved_data_load: Vec<ChunkPosition>,
@@ -57,7 +51,7 @@ pub struct Scanner {
 
     // on detecting a scanner move, these offsets are used to
     // identify the location of what chunks need to be checked
-    pub data_sampling_offsets: Vec<ChunkPosition>,
+    pub worldgen_sampling_offsets: Vec<ChunkPosition>,
     pub mesh_sampling_offsets: Vec<ChunkPosition>,
 }
 
@@ -66,16 +60,13 @@ impl Scanner {
     /// warning: slow execution time on distances above 15-20,
     #[must_use]
     pub fn new(distance: i32) -> Self {
-        let data_distance = distance + 1;
         let mesh_distance = distance;
-        let data_sampling_offsets = make_offset_vec(data_distance);
-        let mesh_sampling_offsets = make_offset_vec(mesh_distance);
+        // This is +1 becuase meshes require all adjacent chunks loaded in a 3x3x3 area before they can be meshed.
+        let worldgen_distance = distance + 1;
+        
         Self {
-            checks_per_frame: 32 * 32 * 32,
-            data_offset: 0,
-            data_sampling_offsets,
-            mesh_sampling_offsets,
-            mesh_offset: 0,
+            worldgen_sampling_offsets: make_offset_vec(worldgen_distance),
+            mesh_sampling_offsets: make_offset_vec(mesh_distance),
             unresolved_data_load: Vec::default(),
             prev_chunk_pos: ChunkPosition::new(777, 777, 777),
             unresolved_mesh_load: Vec::default(),
@@ -101,13 +92,13 @@ fn detect_move(
             return;
         }
         let load_data_area = scanner
-            .data_sampling_offsets
+            .worldgen_sampling_offsets
             .iter()
             .map(|offset| chunk_pos + *offset)
             .collect::<HashSet<ChunkPosition>>();
 
         let unload_data_area = scanner
-            .data_sampling_offsets
+            .worldgen_sampling_offsets
             .iter()
             .map(|offset| previous_chunk_pos + *offset)
             .collect::<HashSet<ChunkPosition>>();

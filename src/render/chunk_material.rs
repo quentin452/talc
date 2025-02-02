@@ -102,22 +102,30 @@ struct ChunkInstanceBuffer {
     length: usize
 }
 
-fn uniform_buffer_bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-    render_device.create_bind_group_layout(
-        "chunk uniform buffer bind ground layout",
-        &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStages::VERTEX,
-            ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
-            count: None,
-        }]
-    )
+#[derive(Resource, Deref, Clone)]
+struct ChunkUniformBufferBindGroupLayout(BindGroupLayout);
+
+impl FromWorld for ChunkUniformBufferBindGroupLayout {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+        let bind_group_layout = render_device.create_bind_group_layout(
+            "chunk uniform buffer bind ground layout",
+            &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX,
+                ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                count: None,
+            }]
+        );
+        ChunkUniformBufferBindGroupLayout(bind_group_layout)
+    }
 }
 
 fn prepare_instance_buffers(
     mut commands: Commands,
     query: Query<(Entity, &ChunkMaterial)>,
     render_device: Res<RenderDevice>,
+    bind_group_layout: Res<ChunkUniformBufferBindGroupLayout>
 ) {
     for (entity, chunk_instance_data) in &query {
         let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -130,18 +138,17 @@ fn prepare_instance_buffers(
             contents: bytemuck::cast_slice(&chunk_instance_data.chunk_position.0.to_array()),
             usage: BufferUsages::UNIFORM,
         });
-        let bind_group_entry = BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Buffer(BufferBinding {
-                buffer: &uniform_buffer,
-                offset: 0,
-                size: None
-            })
-        };
         let uniform_bind_group = render_device.create_bind_group(
             "chunk bind group",
-            &uniform_buffer_bind_group_layout(&render_device),
-            &[bind_group_entry]
+            &bind_group_layout,
+            &[BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::Buffer(BufferBinding {
+                    buffer: &uniform_buffer,
+                    offset: 0,
+                    size: None
+                })
+            }]
         );
         commands.entity(entity).insert(ChunkInstanceBuffer {
             instance_buffer,
@@ -223,17 +230,19 @@ fn queue_custom_mesh_pipeline(
 struct CustomPipeline {
     shader_handle: Handle<Shader>,
     mesh_pipeline: MeshPipeline,
-    render_device: RenderDevice
+    bind_group_layout: ChunkUniformBufferBindGroupLayout
 }
 
 impl FromWorld for CustomPipeline {
     fn from_world(world: &mut World) -> Self {
+        world.init_resource::<ChunkUniformBufferBindGroupLayout>();
+        let bind_group_layout = world.resource::<ChunkUniformBufferBindGroupLayout>();
         let mesh_pipeline = world.resource::<MeshPipeline>();
 
         CustomPipeline {
             shader_handle: world.load_asset(SHADER_ASSET_PATH),
             mesh_pipeline: mesh_pipeline.clone(),
-            render_device: world.resource::<RenderDevice>().clone()
+            bind_group_layout: bind_group_layout.clone()
         }
     }
 }
@@ -280,7 +289,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                 // Bind group 1 is the mesh uniform
                 self.mesh_pipeline.mesh_layouts.model_only.clone(),
                 // Bind group 2 is our custom chunk uniform.
-                uniform_buffer_bind_group_layout(&self.render_device)
+                self.bind_group_layout.0.clone()
             ],
             push_constant_ranges: vec![],
             vertex: VertexState {

@@ -1,5 +1,5 @@
+use crate::bevy::prelude::*;
 use crate::position::FloatingPosition;
-use bevy::prelude::*;
 use std::time::Duration;
 
 #[derive(Component)]

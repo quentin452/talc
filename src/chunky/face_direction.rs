@@ -1,7 +1,6 @@
-use crate::position::RelativePosition;
-
 use super::lod::Lod;
-use bevy::math::{IVec3, ivec3};
+use crate::bevy::prelude::*;
+use crate::position::RelativePosition;
 
 // helper for transforming translations based dir or "axis"
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

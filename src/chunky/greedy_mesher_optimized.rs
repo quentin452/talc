@@ -1,5 +1,9 @@
-use bevy::{platform_support::collections::HashMap, prelude::*};
+use std::collections::HashMap;
 
+use crate::bevy::prelude::*;
+
+use crate::render::chunk_material::BakedChunkMesh;
+use crate::render::wgpu_context::RenderDevice;
 use crate::{
     mod_manager::prototypes::BlockPrototype,
     position::RelativePosition,
@@ -131,7 +135,7 @@ fn calculate_ao(
 }
 
 #[must_use]
-pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<ChunkMaterial> {
+pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &ChunkRefs, lod: Lod) -> Option<BakedChunkMesh> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
@@ -240,7 +244,7 @@ pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Ch
     Some(ChunkMaterial {
         quads,
         chunk_position: chunks_refs.center_chunk_position,
-    })
+    }.bake(&render_device))
 }
 
 #[derive(Debug)]

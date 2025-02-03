@@ -1,22 +1,12 @@
-#import bevy_pbr::{
-    pbr_fragment::pbr_input_from_standard_material,
-    pbr_functions::alpha_discard,
-}
+struct Camera {
+    view_proj: mat4x4<f32>,
+};
+@group(0) @binding(0) var<uniform> camera: Camera;
 
-#import bevy_pbr::{
-    forward_io::{FragmentOutput},
-    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
-}
+@group(1) @binding(0)
+var<uniform> chunk_position: vec3<i32>;
 
-#import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip, mesh_normal_local_to_world}
-#import bevy_pbr::pbr_functions::{calculate_view, prepare_world_normal}
-#import bevy_pbr::mesh_bindings
-#import bevy_pbr::mesh_bindings::mesh
-#import bevy_pbr::pbr_types::pbr_input_new
-#import bevy_pbr::view_transformations::position_world_to_clip
-
-struct Vertex {
-    @builtin(instance_index) instance_index: u32,
+struct VertexInput {
     @location(0) vert_data: u32,
 };
 
@@ -28,6 +18,11 @@ struct VertexOutput {
     @location(3) ambient: f32,
     @location(4) instance_index: u32,
 };
+
+struct Light {
+    position: vec3<f32>,
+    color: vec3<f32>,
+}
 
 var<private> ambient_lerps: vec4<f32> = vec4<f32>(1.0,0.7,0.5,0.15);
 
@@ -46,23 +41,24 @@ fn x_positive_bits(bits: u32) -> u32 {
     return (1u << bits) - 1u;
 }
 
-@group(2) @binding(0)
-var<uniform> chunk_position: vec3<i32>;
-
 @vertex
-fn vertex(vertex: Vertex) -> VertexOutput {
+fn vertex(@builtin(vertex_index) vertex_index: u32, vertex: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    let x = f32(vertex.vert_data & x_positive_bits(6u));
-    let y = f32(vertex.vert_data >> 6u & x_positive_bits(6u));
-    let z = f32(vertex.vert_data >> 12u & x_positive_bits(6u));
-    let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
-    let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
+    let x = f32(vertex.vert_data & x_positive_bits(5u));
+    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u));
+    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u));
+    //let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
+    let ao = 0;
+    //let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
+    let normal_index = 0;
     //let block_index = vertex.vert_data >> 25u & x_positive_bits(7u);
 
-    let local_position = vec4<f32>(x,y,z, 1.0);
-    let world_position = vec4<f32>(f32(chunk_position.x * 32), f32(chunk_position.y * 32), f32(chunk_position.z * 32), 1.0);
-    out.clip_position = position_world_to_clip(world_position.xyz + local_position.xyz);
+    var out: VertexOutput;
+    out.tex_coords = model.tex_coords;
+    out.normal = normals[vertex_index / 2u];
+    out.world_position = model.position;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
 
     let ambient_lerp = ambient_lerps[ao];
     out.ambient = ambient_lerp;
@@ -82,38 +78,29 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     let fun = (low * noise) + (high * (1.0-noise));
     out.blend_color = vec3<f32>(0.3, 0.4, 0.0);
     out.instance_index = vertex.instance_index;
+
     return out;
 }
 
 @fragment
-fn fragment(input: VertexOutput) -> FragmentOutput {
-    var pbr_input = pbr_input_new();
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    let object_color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
 
-    pbr_input.flags = mesh[input.instance_index].flags;
-
-    pbr_input.V = calculate_view(input.world_position, false);
-    pbr_input.frag_coord = input.clip_position;
-    pbr_input.world_position = input.world_position;
-
-    pbr_input.world_normal = prepare_world_normal(
-        input.world_normal,
-        false,
-        false,
+    let light = Light(
+        vec3<f32>(0.0, 100.0, 0.0),
+        vec3<f32>(1.0, 1.0, 1.0),
     );
 
-    pbr_input.N = normalize(pbr_input.world_normal);
+    let ambient_strength = 0.1;
+    let ambient_color = light.color * ambient_strength;
 
-    pbr_input.material.base_color = vec4<f32>(input.blend_color * input.ambient, 1.0);
+    let light_dir = normalize(light.position - in.world_position);
 
-    pbr_input.material.reflectance = vec3<f32>(0.5, 0.5, 0.5);
-    pbr_input.material.perceptual_roughness = 1.0;
-    pbr_input.material.metallic = 0.1;
+    let diffuse_strength = max(dot(in.normal, light_dir), 0.0);
+    let diffuse_color = light.color * diffuse_strength;
 
-    var out: FragmentOutput;
-    out.color = apply_pbr_lighting(pbr_input);
-    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-
-    return out;
+    let result = (ambient_color + diffuse_color) * object_color.xyz;
+    return vec4<f32>(result, object_color.a);
 }
 
 //  MIT License. © Ian McEwan, Stefan Gustavson, Munrocket, Johan Helsing

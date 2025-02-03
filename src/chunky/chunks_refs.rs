@@ -1,6 +1,6 @@
 use std::{hash::Hash, sync::Arc};
 
-use bevy::prelude::*;
+use crate::bevy::prelude::*;
 
 use crate::{
     mod_manager::prototypes::BlockPrototype,

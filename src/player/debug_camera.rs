@@ -1,6 +1,6 @@
-use bevy::input::mouse::MouseMotion;
-use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, PrimaryWindow};
+use crate::bevy::prelude::*;
+use bevy_input::mouse::MouseMotion;
+use bevy_window::{CursorGrabMode, PrimaryWindow, Window};
 
 pub mod prelude {
     pub use crate::*;
@@ -69,7 +69,7 @@ fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow
     if let Ok(mut window) = primary_window.get_single_mut() {
         toggle_grab_cursor(&mut window);
     } else {
-        warn!("Primary window not found for `initial_grab_cursor`!");
+        println!("Primary window not found for `initial_grab_cursor`!");
     }
 }
 
@@ -114,7 +114,7 @@ fn player_move(
             transform.translation += velocity * time.delta_secs() * settings.speed;
         }
     } else {
-        warn!("Primary window not found for `player_move`!");
+        println!("Primary window not found for `player_move`!");
     }
 }
 
@@ -145,7 +145,7 @@ fn player_look(
             }
         }
     } else {
-        warn!("Primary window not found for `player_look`!");
+        println!("Primary window not found for `player_look`!");
     }
 }
 
@@ -160,7 +160,7 @@ fn cursor_grab(
             toggle_grab_cursor(&mut window);
         }
     } else {
-        warn!("Primary window not found for `cursor_grab`!");
+        println!("Primary window not found for `cursor_grab`!");
     }
 }
 
@@ -177,7 +177,7 @@ fn initial_grab_on_flycam_spawn(
     if let Ok(window) = &mut primary_window.get_single_mut() {
         toggle_grab_cursor(window);
     } else {
-        warn!("Primary window not found for `initial_grab_cursor`!");
+        println!("Primary window not found for `initial_grab_cursor`!");
     }
 }
 

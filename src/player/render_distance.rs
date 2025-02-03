@@ -5,9 +5,9 @@ but anything above that might induce some frame lag, due to how the load/unload 
 `scanner::new()` can also be very slow on high render distances, giving an initial slow execution time.
 */
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
-use bevy::{platform_support::collections::HashSet, prelude::*};
+use crate::bevy::prelude::*;
 
 use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;

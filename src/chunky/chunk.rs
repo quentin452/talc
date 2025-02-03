@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use bevy::prelude::*;
+use crate::bevy::prelude::*;
 use bracket_noise::prelude::*;
 
 use crate::{

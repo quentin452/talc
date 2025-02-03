@@ -6,8 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::bevy::prelude::*;
 use anyhow::Result;
-use bevy::prelude::*;
 use mlua::{FromLua, Lua, Table, Value};
 use serde::Deserialize;
 

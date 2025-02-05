@@ -9,6 +9,7 @@ pub struct RenderDevice(Arc<wgpu::Device>);
 
 #[derive(Resource)]
 pub struct WgpuContext {
+    pub device: Arc<wgpu::Device>,
     pub surface: wgpu::Surface<'static>,
     pub surface_config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
@@ -16,12 +17,13 @@ pub struct WgpuContext {
     pub depth_texture: Material,
 }
 
-impl WgpuContext {
-    pub async fn new_async(world: &World, window: &Window) -> WgpuContext {
+impl<'window> WgpuContext {
+    pub async fn new_async(window: &'static winit::window::Window) -> WgpuContext {
         let instance = wgpu::Instance::default();
         let surface = instance
-            .create_surface(Arc::clone(&window))
+            .create_surface(window)
             .expect("Unable to create WGPU surface.");
+        
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -50,10 +52,11 @@ impl WgpuContext {
             .await
             .expect("Failed to create GPU device connection.");
 
-        let device = RenderDevice(Arc::new(device));
+        let device = Arc::new(device);
 
-        let width = window.width().max(1.) as u32;
-        let height = window.height().max(1.) as u32;
+        let size = window.inner_size();
+        let width = size.width.max(1);
+        let height = size.height.max(1);
         let surface_config = surface
             .get_default_config(&adapter, width, height)
             .expect("Requested adapter will support created surface.");
@@ -67,21 +70,21 @@ impl WgpuContext {
             queue,
             object_pipeline: None,
             depth_texture,
+            device
         }
     }
 
-    pub fn new(world: &World, window: &Window) -> Self {
-        block_on(WgpuContext::new_async(world, window))
+    pub fn new(window: &'static winit::window::Window) -> Self {
+        block_on(WgpuContext::new_async(window))
     }
 
-    /*pub fn resize(&mut self, new_size: (u32, u32)) {
+    pub fn resize(&mut self, new_size: (u32, u32)) {
         let (width, height) = new_size;
         self.surface_config.width = width.max(1);
         self.surface_config.height = height.max(1);
         self.surface.configure(&self.device, &self.surface_config);
-        self.depth_texture =
-            material::depth_texture(&self.device, &self.surface_config, "depth_texture");
-    }*/
+        self.depth_texture = depth_texture(&self.device, &self.surface_config);
+    }
 }
 
 pub fn draw(

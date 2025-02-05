@@ -5,6 +5,7 @@
 //! https://sotrh.github.io/learn-wgpu/beginner/tutorial8-depth/
 
 use image::GenericImageView;
+use wgpu::Device;
 
 use super::wgpu_context::RenderDevice;
 
@@ -18,7 +19,7 @@ pub struct Material {
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 pub fn depth_texture(
-    device: &RenderDevice,
+    device: &Device,
     config: &wgpu::SurfaceConfiguration,
 ) -> Material {
     let size = wgpu::Extent3d {

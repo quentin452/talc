@@ -5,7 +5,7 @@ use crate::{bevy::prelude::*, player::camera::Camera};
 use super::{chunk_material::BakedChunkMesh, chunk_render_pipeline::ChunkRenderPipeline, depth_texture::{depth_texture, Material}};
 
 #[derive(Resource, Deref, Clone)]
-pub struct RenderDevice(Arc<wgpu::Device>);
+pub struct RenderDevice(pub Arc<wgpu::Device>);
 
 #[derive(Resource)]
 pub struct WgpuContext {

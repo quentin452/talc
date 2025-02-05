@@ -17,6 +17,7 @@ use std::f32::consts::PI;
 use bevy_app::TaskPoolThreadAssignmentPolicy;
 use bevy_utils::default;
 use render::RenderPlugin;
+use ::winit::event_loop::{ControlFlow, EventLoop};
 use winit::Winit;
 
 use crate::bevy::prelude::*;
@@ -30,7 +31,16 @@ use crate::smooth_transform::smooth_transform;
 use crate::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
 
 fn main() {
-    let mut app = App::new();
+    let app = App::new();
+    let event_loop = EventLoop::new().expect("Failed to create winit event loop.");
+    event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.run_app(&mut Winit {
+        app,
+        window: None
+    }).expect("q");
+}
+
+pub fn add_plugins(app: &mut App) {
     app.add_plugins(RenderPlugin);
     app.add_plugins(TaskPoolPlugin {
         task_pool_options: TaskPoolOptions {
@@ -51,7 +61,7 @@ fn main() {
     app.add_plugins(ModLoaderPlugin);
     app.add_plugins(NoCameraPlayerPlugin);
     app.add_systems(Update, smooth_transform);
-    Winit::run(app);
+    app.run();
 }
 
 pub fn setup(

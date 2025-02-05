@@ -1,30 +1,10 @@
 use winit::{application::ApplicationHandler, event::WindowEvent, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, window::{Window, WindowId}};
 
-use crate::{bevy::prelude::*, render::wgpu_context::WgpuContext};
+use crate::{add_plugins, bevy::prelude::*, render::wgpu_context::{RenderDevice, WgpuContext}};
 
 pub struct Winit {
-    app: App,
-    window: Option<&'static Window>
-}
-
-impl Winit {
-    pub fn run(mut app: App) {
-        let event_loop = EventLoop::new().expect("Failed to create winit event loop.");
-        event_loop.set_control_flow(ControlFlow::Poll);
-        app.run();
-        event_loop.run_app(&mut Self {
-            app,
-            window: None
-        });
-    }
-
-    fn update(&mut self) {
-        
-    }
-
-    fn render(&mut self) {
-        
-    }
+    pub app: App,
+    pub window: Option<&'static Window>
 }
 
 impl ApplicationHandler for Winit {
@@ -39,7 +19,10 @@ impl ApplicationHandler for Winit {
                 .expect("create window err."),
         ));
         let wgpu_context = WgpuContext::new(window);
+        let render_device = RenderDevice(wgpu_context.device.clone());
         self.app.world_mut().insert_resource(wgpu_context);
+        self.app.world_mut().insert_resource(render_device);
+        add_plugins(&mut self.app);
     }
 
     fn device_event(
@@ -72,7 +55,7 @@ impl ApplicationHandler for Winit {
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.render();
+                //self.render();
             }
             _ => (),
         }

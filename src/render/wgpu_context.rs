@@ -86,7 +86,7 @@ impl<'window> WgpuContext {
     }
 }
 
-pub fn draw(
+pub(super) fn draw(
     cameras: Query<&Camera>,
     render_device: Res<RenderDevice>,
     chunk_render_pipeline: Res<ChunkRenderPipeline>,

@@ -43,9 +43,9 @@ fn x_positive_bits(bits: u32) -> u32 {
 
 @vertex
 fn vertex(vertex: VertexInput) -> VertexOutput {
-    let x = i32(vertex.vert_data & x_positive_bits(5u)) + (chunk_position.x * 32);
-    let y = i32(vertex.vert_data >> 5u & x_positive_bits(5u)) + (chunk_position.y * 32);
-    let z = i32(vertex.vert_data >> 10u & x_positive_bits(5u)) + (chunk_position.z * 32);
+    let x = i32(vertex.vert_data & x_positive_bits(5u)) + (chunk_position.x * 32) + i32(vertex.constant_quad.x);
+    let y = i32(vertex.vert_data >> 5u & x_positive_bits(5u)) + (chunk_position.y * 32) + i32(vertex.constant_quad.y);
+    let z = i32(vertex.vert_data >> 10u & x_positive_bits(5u)) + (chunk_position.z * 32) + i32(vertex.constant_quad.z);
     //let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
     let ao = 0.0;
     //let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);

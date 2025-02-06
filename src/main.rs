@@ -15,6 +15,8 @@ pub mod winit;
 use std::f32::consts::PI;
 
 use bevy_app::TaskPoolThreadAssignmentPolicy;
+use bevy_input::InputPlugin;
+use bevy_time::TimePlugin;
 use bevy_utils::default;
 use render::RenderPlugin;
 use ::winit::event_loop::{ControlFlow, EventLoop};
@@ -56,6 +58,8 @@ pub fn add_plugins(app: &mut App) {
     });
     app.add_plugins(AsyncChunkloaderPlugin);
     app.add_plugins(SunPlugin);
+    app.add_plugins(TimePlugin);
+    app.add_plugins(InputPlugin);
     app.add_plugins(ScannerPlugin);
     app.add_systems(Startup, setup);
     app.add_plugins(ModLoaderPlugin);
@@ -67,6 +71,7 @@ pub fn add_plugins(app: &mut App) {
 pub fn setup(
     mut commands: Commands,
 ) {
+    player::player::new(&mut commands);
     commands.spawn((
         Name::new("Sun"),
         crate::sun::Sun,

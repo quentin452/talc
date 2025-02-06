@@ -25,7 +25,6 @@ bevy_math = {git = "https://github.com/bushrat011899/bevy", package = "bevy_math
 bevy_transform = {git = "https://github.com/bushrat011899/bevy", package = "bevy_transform"}
 bevy_color = {git = "https://github.com/bushrat011899/bevy", package = "bevy_color"}
 bevy_input = {git = "https://github.com/bushrat011899/bevy", package = "bevy_input"}
-bevy_window = {git = "https://github.com/bushrat011899/bevy", package = "bevy_window"}
 anyhow = "1.0.95"
 bracket-noise = "0.8"
 futures-lite = "2.6"

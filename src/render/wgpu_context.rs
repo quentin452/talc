@@ -1,7 +1,6 @@
 use std::sync::Arc;
-use bevy_window::{PrimaryWindow, Window};
 use wgpu::MemoryHints::Performance;
-use crate::{bevy::prelude::*, player::camera::Camera};
+use crate::{bevy::prelude::*, player::camera::Camera, winit::PrimaryWindow};
 use super::{chunk_material::BakedChunkMesh, chunk_render_pipeline::ChunkRenderPipeline, depth_texture::{depth_texture, Material}};
 
 #[derive(Resource, Deref, Clone)]
@@ -92,62 +91,60 @@ pub fn draw(
     render_device: Res<RenderDevice>,
     chunk_render_pipeline: Res<ChunkRenderPipeline>,
     wgpu_context: Res<WgpuContext>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
+    window: Res<PrimaryWindow>,
     to_draw: Query<&BakedChunkMesh>
 ) {
-    if let Ok(window) = primary_window.get_single() {
-        let aspect_ratio = (f64::from(window.width()) / f64::from(window.height())) as f32;
+    let aspect_ratio = (f64::from(window.width()) / f64::from(window.height())) as f32;
 
-        for camera in cameras.iter() {
-            let surface_texture = wgpu_context
-                .surface
-                .get_current_texture()
-                .expect("Failed to acquire next swap chain texture");
-            let texture_view = surface_texture
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let mut encoder = render_device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    for camera in cameras.iter() {
+        let surface_texture = wgpu_context
+            .surface
+            .get_current_texture()
+            .expect("Failed to acquire next swap chain texture");
+        let texture_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = render_device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &texture_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.6,
-                            g: 0.9,
-                            b: 1.0,
-                            a: 0.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &wgpu_context.depth_texture.view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &texture_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.6,
+                        g: 0.9,
+                        b: 1.0,
+                        a: 0.0,
                     }),
-                    stencil_ops: None,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &wgpu_context.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
                 }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            render_pass.set_pipeline(&chunk_render_pipeline);
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        render_pass.set_pipeline(&chunk_render_pipeline);
 
-            let baked_camera = camera.bake(&render_device, aspect_ratio);
-            render_pass.set_bind_group(0, &baked_camera.bind_group, &[]);
+        let baked_camera = camera.bake(&render_device, aspect_ratio);
+        render_pass.set_bind_group(0, &baked_camera.bind_group, &[]);
 
-            for chunk in to_draw.iter() {
-                chunk.render(&mut render_pass);
-            }
-            
-            std::mem::drop(render_pass);
-
-            wgpu_context.queue.submit(Some(encoder.finish()));
-            surface_texture.present();
+        for chunk in to_draw.iter() {
+            chunk.render(&mut render_pass);
         }
+        
+        std::mem::drop(render_pass);
+
+        wgpu_context.queue.submit(Some(encoder.finish()));
+        surface_texture.present();
     }
 }

@@ -2,7 +2,7 @@ use crate::{bevy::prelude::*, position::FloatingPosition};
 
 use super::{camera::Camera, debug_camera::FlyCam, render_distance::Scanner};
 
-fn new(commands: &mut Commands) {
+pub fn new(commands: &mut Commands) {
     commands.spawn((
         Scanner::new(12),
         Transform::from_xyz(0.0, 200.0, 0.5),

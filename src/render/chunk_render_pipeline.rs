@@ -10,23 +10,31 @@ pub(super) struct ChunkRenderPipeline(RenderPipeline);
 
 impl ChunkRenderPipeline {
     pub fn new(render_device: &RenderDevice, surface_config: &SurfaceConfiguration) -> Self {
-        // Define a buffer layout for our vertex buffer.
-        let vertex_buffer_layout = VertexBufferLayout {
-            array_stride: std::mem::size_of::<u32>() as wgpu::BufferAddress,
+        // Define a buffer layout for our vertex buffer. This buffer stores a constant quad.
+        let constant_quad_vertex_buffer_layout = VertexBufferLayout {
+            array_stride: 0,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
-                wgpu::VertexAttribute { // constant quad
+                wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0,
                     format: wgpu::VertexFormat::Float32x3,
                 },
-                wgpu::VertexAttribute { // instanced data. each instance only needs a single U32. see `chunk_material::PackedQuad` for binary format.
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 0,
+            ],
+        };
+
+        // instanced data. each instance only needs a single U32. see `chunk_material::PackedQuad` for binary format.
+        let instanced_vertex_buffer_layout = VertexBufferLayout {
+            array_stride: 0,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
             ],
-        };
+        };                
 
         let shader: wgpu::ShaderModule =
             render_device.create_shader_module(include_wgsl!("../../assets/shaders/chunk.wgsl"));
@@ -50,7 +58,7 @@ impl ChunkRenderPipeline {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vertex"),
-                buffers: &[vertex_buffer_layout],
+                buffers: &[constant_quad_vertex_buffer_layout, instanced_vertex_buffer_layout],
                 compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -72,8 +80,8 @@ impl ChunkRenderPipeline {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: TextureFormat::Depth32Float,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less, // 1.
-                stencil: wgpu::StencilState::default(),     // 2.
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState {

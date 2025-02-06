@@ -14,7 +14,7 @@ pub mod winit;
 
 use std::f32::consts::PI;
 
-use bevy_app::TaskPoolThreadAssignmentPolicy;
+use bevy_app::{ScheduleRunnerPlugin, TaskPoolThreadAssignmentPolicy};
 use bevy_input::InputPlugin;
 use bevy_time::TimePlugin;
 use bevy_utils::default;
@@ -39,7 +39,7 @@ fn main() {
     event_loop.run_app(&mut Winit {
         app,
         window: None
-    }).expect("q");
+    }).expect("Could not start winit event loop.");
 }
 
 pub fn add_plugins(app: &mut App) {
@@ -64,6 +64,7 @@ pub fn add_plugins(app: &mut App) {
     app.add_systems(Startup, setup);
     app.add_plugins(ModLoaderPlugin);
     app.add_plugins(NoCameraPlayerPlugin);
+    app.add_plugins(ScheduleRunnerPlugin::default());
     app.add_systems(Update, smooth_transform);
     app.run();
 }

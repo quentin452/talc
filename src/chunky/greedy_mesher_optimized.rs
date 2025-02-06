@@ -6,7 +6,7 @@ use crate::render::chunk_material::BakedChunkMesh;
 use crate::render::wgpu_context::RenderDevice;
 use crate::{
     mod_manager::prototypes::BlockPrototype,
-    position::RelativePosition,
+    position::Position,
     render::chunk_material::{ChunkMaterial, PackedQuad},
 };
 
@@ -92,9 +92,9 @@ fn calculate_ao(
 
                     // get the voxel position based on axis
                     let voxel_pos = match axis {
-                        0 | 1 => RelativePosition::new(x as i32, y as i32, z as i32), // down,up
-                        2 | 3 => RelativePosition::new(y as i32, z as i32, x as i32), // left, right
-                        _ => RelativePosition::new(x as i32, z as i32, y as i32), // forward, back
+                        0 | 1 => Position::new(x as i32, y as i32, z as i32), // down,up
+                        2 | 3 => Position::new(y as i32, z as i32, x as i32), // left, right
+                        _ => Position::new(x as i32, z as i32, y as i32), // forward, back
                     };
 
                     // calculate ambient occlusion
@@ -102,12 +102,12 @@ fn calculate_ao(
                     for (ao_i, ao_offset) in ADJACENT_AO_DIRS.iter().enumerate() {
                         // ambient occlusion is sampled based on axis(ascent or descent)
                         let ao_sample_offset = match axis {
-                            0 => RelativePosition::new(ao_offset.x, -1, ao_offset.y), // down
-                            1 => RelativePosition::new(ao_offset.x, 1, ao_offset.y),  // up
-                            2 => RelativePosition::new(-1, ao_offset.y, ao_offset.x), // left
-                            3 => RelativePosition::new(1, ao_offset.y, ao_offset.x),  // right
-                            4 => RelativePosition::new(ao_offset.x, ao_offset.y, -1), // forward
-                            _ => RelativePosition::new(ao_offset.x, ao_offset.y, 1),  // back
+                            0 => Position::new(ao_offset.x, -1, ao_offset.y), // down
+                            1 => Position::new(ao_offset.x, 1, ao_offset.y),  // up
+                            2 => Position::new(-1, ao_offset.y, ao_offset.x), // left
+                            3 => Position::new(1, ao_offset.y, ao_offset.x),  // right
+                            4 => Position::new(ao_offset.x, ao_offset.y, -1), // forward
+                            _ => Position::new(ao_offset.x, ao_offset.y, 1),  // back
                         };
                         let ao_voxel_pos = voxel_pos + ao_sample_offset;
                         let ao_block = chunks_refs.get_block(ao_voxel_pos);
@@ -180,7 +180,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in [0, CHUNK_SIZE_P - 1] {
         for y in 0..CHUNK_SIZE_P {
             for x in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -188,7 +188,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in 0..CHUNK_SIZE_P {
         for y in [0, CHUNK_SIZE_P - 1] {
             for x in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -196,7 +196,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in 0..CHUNK_SIZE_P {
         for x in [0, CHUNK_SIZE_P - 1] {
             for y in 0..CHUNK_SIZE_P {
-                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }

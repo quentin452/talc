@@ -84,7 +84,7 @@ fn detect_move(
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
             / CHUNK_SIZE_I32;
-        let chunk_pos = ChunkPosition(chunk_pos);
+        let chunk_pos = chunk_pos.into();
         let previous_chunk_pos = scanner.prev_chunk_pos;
         let chunk_pos_changed = chunk_pos != scanner.prev_chunk_pos;
         scanner.prev_chunk_pos = chunk_pos;
@@ -167,12 +167,12 @@ fn detect_move(
         });
 
         scanner.unresolved_mesh_load.sort_by(|a, b| {
-            a.0.distance_squared(chunk_pos.0)
-                .cmp(&b.0.distance_squared(chunk_pos.0))
+            a.distance_squared(*chunk_pos)
+                .cmp(&b.distance_squared(*chunk_pos))
         });
         scanner.unresolved_data_load.sort_by(|a, b| {
-            a.0.distance_squared(chunk_pos.0)
-                .cmp(&b.0.distance_squared(chunk_pos.0))
+            a.distance_squared(*chunk_pos)
+                .cmp(&b.distance_squared(*chunk_pos))
         });
     }
 }
@@ -180,15 +180,15 @@ fn detect_move(
 /// constructs spherical chunk positions with the provided chunk radius
 fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
     let k = (half * 2) + 1;
-    let mut sampling_offsets = vec![];
+    let mut sampling_offsets: Vec<ChunkPosition> = vec![];
     for i in 0..k * k * k {
         let mut pos = index_to_ivec3_bounds(i, k);
         pos -= IVec3::splat((k as f32 * 0.5) as i32);
-        sampling_offsets.push(ChunkPosition(pos));
+        sampling_offsets.push(pos.into());
     }
     sampling_offsets.sort_by(|a, b| {
-        a.0.distance_squared(IVec3::ZERO)
-            .cmp(&b.0.distance_squared(IVec3::ZERO))
+        a.distance_squared(IVec3::ZERO)
+            .cmp(&b.distance_squared(IVec3::ZERO))
     });
     sampling_offsets
 }

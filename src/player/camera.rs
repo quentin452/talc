@@ -22,7 +22,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn build_view_projection_matrix(&self, aspect_ratio: f32) -> cgmath::Matrix4<f32> {
-        let eye = self.eye.0;
+        let eye = self.eye;
         let eye = Point3::new(eye.x, eye.y, eye.z);
         let orientation = self.orientation;
         let orientation = Vector3::new(orientation.x, orientation.y, orientation.z);

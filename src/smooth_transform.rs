@@ -14,10 +14,10 @@ impl SmoothTransformTo {
     #[must_use]
     pub fn new(timer: &Time, end: FloatingPosition, blocks_per_second: f32) -> Self {
         Self {
-            direction: end.0.normalize(),
+            direction: end.normalize(),
             blocks_per_second,
             end_timestamp: timer.elapsed()
-                + Duration::from_secs_f32(end.0.distance(Vec3::ZERO) / blocks_per_second),
+                + Duration::from_secs_f32(end.distance(Vec3::ZERO) / blocks_per_second),
         }
     }
 }

@@ -1,6 +1,6 @@
 use super::lod::Lod;
 use crate::bevy::prelude::*;
-use crate::position::RelativePosition;
+use crate::position::Position;
 
 // helper for transforming translations based dir or "axis"
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -42,15 +42,15 @@ impl FaceDir {
 
     /// offset input position with this face direction
     #[must_use]
-    pub const fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> RelativePosition {
-        RelativePosition(match self {
+    pub fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> Position {
+        match self {
             Self::Up => ivec3(x, axis, y),
             Self::Down => ivec3(x, axis, y),
             Self::Left => ivec3(axis, y, x),
             Self::Right => ivec3(axis, y, x),
             Self::Forward => ivec3(x, y, axis),
             Self::Back => ivec3(x, y, axis),
-        })
+        }.into()
     }
 
     /// returns true if vertices should be reverse.

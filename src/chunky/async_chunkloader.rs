@@ -67,8 +67,8 @@ impl AsyncChunkloader {
             .max(0) as usize;
 
         self.load_chunk_queue.sort_by(|a, b| {
-            a.0.distance_squared(player_chunk_position.0)
-                .cmp(&b.0.distance_squared(player_chunk_position.0))
+            a.distance_squared(*player_chunk_position)
+                .cmp(&b.distance_squared(*player_chunk_position))
         });
 
         self.load_chunk_queue.drain(0..tasks_left)
@@ -87,12 +87,10 @@ impl AsyncChunkloader {
 
         self.load_mesh_queue.sort_by(|a, b| {
             a.center_chunk_position
-                .0
-                .distance_squared(player_chunk_position.0)
+                .distance_squared(*player_chunk_position)
                 .cmp(
                     &b.center_chunk_position
-                        .0
-                        .distance_squared(player_chunk_position.0),
+                        .distance_squared(*player_chunk_position),
                 )
         });
 
@@ -129,9 +127,8 @@ fn spawn_chunk_as_bevy_entity(
             Vec3::new(CHUNK_SIZE_F32, CHUNK_SIZE_F32, CHUNK_SIZE_F32),
         ),
         Transform::from_translation(
-            (FloatingPosition::from(chunk_position)
-                + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.))
-            .0,
+            *(FloatingPosition::from(chunk_position)
+                + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.)),
         ),
     ));
 
@@ -148,7 +145,7 @@ fn start_worldgen_threads(
 ) {
     let task_pool = AsyncComputeTaskPool::get();
     let scanner = scanners.single();
-    let player_position = FloatingPosition(scanner.translation());
+    let player_position = scanner.translation().into();
 
     let to_load: Vec<ChunkPosition> = chunkloader.get_chunks_to_load(player_position).collect();
     for chunk_position in to_load {
@@ -189,7 +186,7 @@ fn start_mesh_threads(
 ) {
     let task_pool = AsyncComputeTaskPool::get();
     let scanner = scanners.single();
-    let player_position = FloatingPosition(scanner.translation());
+    let player_position = scanner.translation().into();
 
     let to_mesh: Vec<ChunkRefs> = chunkloader.get_chunks_to_mesh(player_position).collect();
     for chunk_refs in to_mesh {

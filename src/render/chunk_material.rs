@@ -14,12 +14,9 @@ use wgpu::{
     *,
 };
 
-use crate::position::RelativePosition;
+use crate::position::Position;
 
 use super::wgpu_context::RenderDevice;
-
-/// This example uses a shader source file from the assets subdirectory
-const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
 /// In talc we draw quads instead of triangles.
 /// This struct repersents bit packed data for each quad ready to be sent to the GPU.
@@ -43,15 +40,15 @@ impl PackedQuad {
     #[inline]
     #[must_use]
     pub fn new(
-        position: RelativePosition,
+        position: Position,
         normal: u32,
         _ao: u32,
         x_strech: u32,
         y_strech: u32,
     ) -> PackedQuad {
-        let x = position.x();
-        let y = position.y();
-        let z = position.z();
+        let x = position.x;
+        let y = position.y;
+        let z = position.z;
 
         let ao = 0; // todo
         let x_strech = x_strech.min(31);
@@ -59,9 +56,9 @@ impl PackedQuad {
 
         #[rustfmt::skip]
         {
-            debug_assert!(0 <= position.x() && position.x() < 32, "x position out of range. expected 0..=31, got {x}");
-            debug_assert!(0 <= position.y() && position.y() < 32, "y position out of range. expected 0..=31, got {y}");
-            debug_assert!(0 <= position.z() && position.z() < 32, "z position out of range. expected 0..=31, got {z}");
+            debug_assert!(0 <= x && x < 32, "x position out of range. expected 0..=31, got {x}");
+            debug_assert!(0 <= y && y < 32, "y position out of range. expected 0..=31, got {y}");
+            debug_assert!(0 <= z && z < 32, "z position out of range. expected 0..=31, got {z}");
             debug_assert!(normal < 6, "normal out of range. expected 0..=6, got {normal}");
             debug_assert!(ao < 4, "ao out of range. expected 0..=3, got {ao}");
             debug_assert!(x_strech < 32, "x strech out of range. expected 0..=31, got {x_strech}");
@@ -132,7 +129,7 @@ impl ChunkMaterial {
         });
         let uniform_buffer = render_device.create_buffer_init(&BufferInitDescriptor {
             label: Some("chunk uniform buffer"),
-            contents: bytemuck::cast_slice(&self.chunk_position.0.to_array()),
+            contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
             usage: BufferUsages::UNIFORM,
         });
         let uniform_bind_group = render_device.create_bind_group(&BindGroupDescriptor {

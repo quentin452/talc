@@ -104,6 +104,11 @@ impl BakedChunkMesh {
             1,
             self.instance_buffer.slice(..)
         );
+        render_pass.set_bind_group(
+            1,
+            Some(&self.uniform_bind_group),
+            &[]
+        );
         render_pass.draw_indexed(
             0..self.simple_quad_index_buffer.length,
             0,

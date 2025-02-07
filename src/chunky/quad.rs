@@ -1,4 +1,4 @@
-use crate::bevy::prelude::*;
+use bevy::prelude::*;
 
 // helper
 #[derive(Copy, Clone)]

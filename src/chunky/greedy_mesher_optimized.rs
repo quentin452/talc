@@ -1,13 +1,17 @@
-use std::collections::HashMap;
+use std::collections::VecDeque;
 
-use crate::bevy::prelude::*;
+use bevy::{
+    asset::RenderAssetUsages,
+    platform_support::collections::HashMap,
+    prelude::*,
+    render::mesh::{Indices, PrimitiveTopology},
+};
 
-use crate::render::chunk_material::BakedChunkMesh;
-use crate::render::wgpu_context::RenderDevice;
 use crate::{
     mod_manager::prototypes::BlockPrototype,
-    position::Position,
-    render::chunk_material::{ChunkMaterial, PackedQuad},
+    position::RelativePosition,
+    render::chunk_material::ATTRIBUTE_VOXEL,
+    utils::{generate_indices, make_vertex_u32},
 };
 
 use super::{
@@ -92,9 +96,9 @@ fn calculate_ao(
 
                     // get the voxel position based on axis
                     let voxel_pos = match axis {
-                        0 | 1 => Position::new(x as i32, y as i32, z as i32), // down,up
-                        2 | 3 => Position::new(y as i32, z as i32, x as i32), // left, right
-                        _ => Position::new(x as i32, z as i32, y as i32), // forward, back
+                        0 | 1 => RelativePosition::new(x as i32, y as i32, z as i32), // down,up
+                        2 | 3 => RelativePosition::new(y as i32, z as i32, x as i32), // left, right
+                        _ => RelativePosition::new(x as i32, z as i32, y as i32), // forward, back
                     };
 
                     // calculate ambient occlusion
@@ -102,12 +106,12 @@ fn calculate_ao(
                     for (ao_i, ao_offset) in ADJACENT_AO_DIRS.iter().enumerate() {
                         // ambient occlusion is sampled based on axis(ascent or descent)
                         let ao_sample_offset = match axis {
-                            0 => Position::new(ao_offset.x, -1, ao_offset.y), // down
-                            1 => Position::new(ao_offset.x, 1, ao_offset.y),  // up
-                            2 => Position::new(-1, ao_offset.y, ao_offset.x), // left
-                            3 => Position::new(1, ao_offset.y, ao_offset.x),  // right
-                            4 => Position::new(ao_offset.x, ao_offset.y, -1), // forward
-                            _ => Position::new(ao_offset.x, ao_offset.y, 1),  // back
+                            0 => RelativePosition::new(ao_offset.x, -1, ao_offset.y), // down
+                            1 => RelativePosition::new(ao_offset.x, 1, ao_offset.y),  // up
+                            2 => RelativePosition::new(-1, ao_offset.y, ao_offset.x), // left
+                            3 => RelativePosition::new(1, ao_offset.y, ao_offset.x),  // right
+                            4 => RelativePosition::new(ao_offset.x, ao_offset.y, -1), // forward
+                            _ => RelativePosition::new(ao_offset.x, ao_offset.y, 1),  // back
                         };
                         let ao_voxel_pos = voxel_pos + ao_sample_offset;
                         let ao_block = chunks_refs.get_block(ao_voxel_pos);
@@ -135,7 +139,7 @@ fn calculate_ao(
 }
 
 #[must_use]
-pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &ChunkRefs, lod: Lod) -> Option<BakedChunkMesh> {
+pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
@@ -180,7 +184,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in [0, CHUNK_SIZE_P - 1] {
         for y in 0..CHUNK_SIZE_P {
             for x in 0..CHUNK_SIZE_P {
-                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -188,7 +192,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in 0..CHUNK_SIZE_P {
         for y in [0, CHUNK_SIZE_P - 1] {
             for x in 0..CHUNK_SIZE_P {
-                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -196,7 +200,7 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
     for z in 0..CHUNK_SIZE_P {
         for x in [0, CHUNK_SIZE_P - 1] {
             for y in 0..CHUNK_SIZE_P {
-                let pos = Position::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
+                let pos = RelativePosition::new(x as i32 - 1, y as i32 - 1, z as i32 - 1);
                 add_voxel_to_axis_cols(chunks_refs.get_block(pos), x, y, z, &mut axis_cols);
             }
         }
@@ -204,9 +208,9 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
 
     let data = calculate_ao(chunks_refs, &axis_cols);
 
-    let mut quads: Vec<PackedQuad> = vec![];
+    let mut vertices: Vec<u32> = vec![];
     for (axis, block_ao_data) in data.into_iter().enumerate() {
-        let face_dir = match axis {
+        let facedir = match axis {
             0 => FaceDir::Down,
             1 => FaceDir::Up,
             2 => FaceDir::Left,
@@ -216,43 +220,121 @@ pub fn build_chunk_instance_data(render_device: RenderDevice, chunks_refs: &Chun
         };
         for (block_ao, axis_plane) in block_ao_data {
             let ao = block_ao & 0b111111111;
+            let block_type = block_ao >> 9;
             for (axis_pos, plane) in axis_plane {
-                for greedy_quad in greedy_mesh_binary_plane(plane, lod.size() as u32) {
-                    let axis = axis_pos as i32;
-                    let packed_quad = PackedQuad::new(
-                        face_dir.world_to_sample(
-                            axis,
-                            greedy_quad.x as i32,
-                            greedy_quad.y as i32,
-                            lod,
-                        ),
-                        face_dir.normal_index(),
+                let quads_from_axis = greedy_mesh_binary_plane(plane, lod.size() as u32);
+
+                for q in quads_from_axis {
+                    q.append_vertices(
+                        &mut vertices,
+                        facedir,
+                        axis_pos,
+                        Lod::default(),
                         ao,
-                        greedy_quad.h,
-                        greedy_quad.w,
+                        block_type,
                     );
-                    quads.push(packed_quad);
                 }
             }
         }
     }
 
-    if quads.is_empty() {
+    if vertices.is_empty() {
         return None;
     }
 
-    Some(ChunkMaterial {
-        quads,
-        chunk_position: chunks_refs.center_chunk_position,
-    }.bake(&render_device))
+    let mut bevy_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    let vertex_count = vertices.len();
+    bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, vertices);
+    bevy_mesh.insert_indices(Indices::U32(generate_indices(vertex_count)));
+    Some(bevy_mesh)
 }
 
+// todo: compress further?
 #[derive(Debug)]
 pub struct GreedyQuad {
     pub x: u32,
     pub y: u32,
     pub w: u32,
     pub h: u32,
+}
+
+impl GreedyQuad {
+    /// compress this quad data into the input vertices vec
+    pub fn append_vertices(
+        &self,
+        vertices: &mut Vec<u32>,
+        face_dir: FaceDir,
+        axis: u32,
+        lod: Lod,
+        ao: u32,
+        block_type: u32,
+    ) {
+        // let negate_axis = face_dir.negate_axis();
+        // let axis = axis as i32 + negate_axis;
+        let axis = axis as i32;
+        let jump = lod.jump_index();
+
+        // pack ambient occlusion strength into vertex
+        let v1ao = (ao & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
+        let v2ao = ((ao >> 3) & 1) + ((ao >> 6) & 1) + ((ao >> 7) & 1);
+        let v3ao = ((ao >> 5) & 1) + ((ao >> 8) & 1) + ((ao >> 7) & 1);
+        let v4ao = ((ao >> 1) & 1) + ((ao >> 2) & 1) + ((ao >> 5) & 1);
+
+        let v1 = make_vertex_u32(
+            face_dir.world_to_sample(axis, self.x as i32, self.y as i32, lod) * jump,
+            v1ao,
+            face_dir.normal_index(),
+            block_type,
+        );
+        let v2 = make_vertex_u32(
+            face_dir.world_to_sample(axis, self.x as i32 + self.w as i32, self.y as i32, lod)
+                * jump,
+            v2ao,
+            face_dir.normal_index(),
+            block_type,
+        );
+        let v3 = make_vertex_u32(
+            face_dir.world_to_sample(
+                axis,
+                self.x as i32 + self.w as i32,
+                self.y as i32 + self.h as i32,
+                lod,
+            ) * jump,
+            v3ao,
+            face_dir.normal_index(),
+            block_type,
+        );
+        let v4 = make_vertex_u32(
+            face_dir.world_to_sample(axis, self.x as i32, self.y as i32 + self.h as i32, lod)
+                * jump,
+            v4ao,
+            face_dir.normal_index(),
+            block_type,
+        );
+
+        // the quad vertices to be added
+        let mut new_vertices = VecDeque::from([v1, v2, v3, v4]);
+
+        // triangle vertex order is different depending on the facing direction
+        // due to indices always being the same
+        if face_dir.reverse_order() {
+            // keep first index, but reverse the rest
+            let o = new_vertices.split_off(1);
+            o.into_iter().rev().for_each(|i| new_vertices.push_back(i));
+        }
+
+        // anisotropy flip
+        if (v1ao > 0) ^ (v3ao > 0) {
+            // right shift array, to swap triangle intersection angle
+            let f = new_vertices.pop_front().unwrap();
+            new_vertices.push_back(f);
+        }
+
+        vertices.extend(new_vertices);
+    }
 }
 
 /// generate quads of a binary slice

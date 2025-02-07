@@ -1,5 +1,5 @@
-use crate::bevy::prelude::*;
 use crate::position::FloatingPosition;
+use bevy::prelude::*;
 use std::time::Duration;
 
 #[derive(Component)]
@@ -14,10 +14,10 @@ impl SmoothTransformTo {
     #[must_use]
     pub fn new(timer: &Time, end: FloatingPosition, blocks_per_second: f32) -> Self {
         Self {
-            direction: end.normalize(),
+            direction: end.0.normalize(),
             blocks_per_second,
             end_timestamp: timer.elapsed()
-                + Duration::from_secs_f32(end.distance(Vec3::ZERO) / blocks_per_second),
+                + Duration::from_secs_f32(end.0.distance(Vec3::ZERO) / blocks_per_second),
         }
     }
 }

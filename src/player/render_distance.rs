@@ -5,9 +5,9 @@ but anything above that might induce some frame lag, due to how the load/unload 
 `scanner::new()` can also be very slow on high render distances, giving an initial slow execution time.
 */
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
-use crate::bevy::prelude::*;
+use bevy::{platform_support::collections::HashSet, prelude::*};
 
 use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;
@@ -63,7 +63,7 @@ impl Scanner {
         let mesh_distance = distance;
         // This is +1 becuase meshes require all adjacent chunks loaded in a 3x3x3 area before they can be meshed.
         let worldgen_distance = distance + 1;
-
+        
         Self {
             worldgen_sampling_offsets: make_offset_vec(worldgen_distance),
             mesh_sampling_offsets: make_offset_vec(mesh_distance),
@@ -84,7 +84,7 @@ fn detect_move(
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
             / CHUNK_SIZE_I32;
-        let chunk_pos = chunk_pos.into();
+        let chunk_pos = ChunkPosition(chunk_pos);
         let previous_chunk_pos = scanner.prev_chunk_pos;
         let chunk_pos_changed = chunk_pos != scanner.prev_chunk_pos;
         scanner.prev_chunk_pos = chunk_pos;
@@ -167,12 +167,12 @@ fn detect_move(
         });
 
         scanner.unresolved_mesh_load.sort_by(|a, b| {
-            a.distance_squared(*chunk_pos)
-                .cmp(&b.distance_squared(*chunk_pos))
+            a.0.distance_squared(chunk_pos.0)
+                .cmp(&b.0.distance_squared(chunk_pos.0))
         });
         scanner.unresolved_data_load.sort_by(|a, b| {
-            a.distance_squared(*chunk_pos)
-                .cmp(&b.distance_squared(*chunk_pos))
+            a.0.distance_squared(chunk_pos.0)
+                .cmp(&b.0.distance_squared(chunk_pos.0))
         });
     }
 }
@@ -180,15 +180,15 @@ fn detect_move(
 /// constructs spherical chunk positions with the provided chunk radius
 fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
     let k = (half * 2) + 1;
-    let mut sampling_offsets: Vec<ChunkPosition> = vec![];
+    let mut sampling_offsets = vec![];
     for i in 0..k * k * k {
         let mut pos = index_to_ivec3_bounds(i, k);
         pos -= IVec3::splat((k as f32 * 0.5) as i32);
-        sampling_offsets.push(pos.into());
+        sampling_offsets.push(ChunkPosition(pos));
     }
     sampling_offsets.sort_by(|a, b| {
-        a.distance_squared(IVec3::ZERO)
-            .cmp(&b.distance_squared(IVec3::ZERO))
+        a.0.distance_squared(IVec3::ZERO)
+            .cmp(&b.0.distance_squared(IVec3::ZERO))
     });
     sampling_offsets
 }

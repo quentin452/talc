@@ -1,4 +1,5 @@
-use crate::bevy::prelude::*;
+use bevy::math::{IVec2, ivec2};
+
 use crate::position::ChunkPosition;
 
 pub const ADJACENT_CHUNK_DIRECTIONS: [ChunkPosition; 27] = [

@@ -1,92 +1,106 @@
-#![feature(stmt_expr_attributes)]
-
-pub mod bevy;
-pub mod chunky;
-pub mod frustrum_culling;
-pub mod mod_manager;
-pub mod player;
-pub mod position;
-pub mod render;
-pub mod smooth_transform;
-pub mod sun;
-pub mod utils;
-pub mod winit;
-
 use std::f32::consts::PI;
-use std::time::Duration;
 
-use bevy_app::{ScheduleRunnerPlugin, TaskPoolThreadAssignmentPolicy, TerminalCtrlCHandlerPlugin};
-use bevy_input::InputPlugin;
-use bevy_log::LogPlugin;
-use bevy_time::TimePlugin;
-use bevy_utils::default;
-use render::RenderPlugin;
-use ::winit::event_loop::{ControlFlow, EventLoop};
-use winit::Winit;
+use bevy::prelude::*;
+use bevy::{
+    app::TaskPoolThreadAssignmentPolicy,
+    core_pipeline::bloom::Bloom,
+    pbr::{Atmosphere, AtmosphereSettings},
+    render::{
+        RenderPlugin,
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+    },
+};
 
-use crate::bevy::prelude::*;
-
-use crate::mod_manager::mod_loader::ModLoaderPlugin;
-use crate::player::{
-    debug_camera::NoCameraPlayerPlugin,
+use talc::mod_manager::mod_loader::ModLoaderPlugin;
+use talc::player::{
+    debug_camera::{FlyCam, NoCameraPlayerPlugin},
+    render_distance::Scanner,
     render_distance::ScannerPlugin,
 };
-use crate::smooth_transform::smooth_transform;
-use crate::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
+use talc::render::chunk_material::CustomChunkMaterialPlugin;
+use talc::smooth_transform::smooth_transform;
+use talc::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
 
 fn main() {
-    let app = App::new();
-    let event_loop = EventLoop::new().expect("Failed to create winit event loop.");
-    event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.run_app(&mut Winit::new(app)).expect("Could not start winit event loop.");
-}
-
-pub fn add_plugins(app: &mut App) {
-    app.add_plugins(RenderPlugin);
-    app.add_plugins(TaskPoolPlugin {
-        task_pool_options: TaskPoolOptions {
-            async_compute: TaskPoolThreadAssignmentPolicy {
-                min_threads: 1,
-                max_threads: 8,
-                percent: 0.75,
-                on_thread_spawn: None,
-                on_thread_destroy: None,
-            },
-            ..default()
-        },
-    });
-    app.add_plugins(AsyncChunkloaderPlugin);
-    app.add_plugins(SunPlugin);
-    app.add_plugins(TimePlugin);
-    app.add_plugins(InputPlugin);
-    app.add_plugins(ScannerPlugin);
-    app.add_systems(Startup, setup);
-    app.add_plugins(ModLoaderPlugin);
-    app.add_plugins(NoCameraPlayerPlugin);
-    app.add_plugins(TransformPlugin);
-    app.add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1./64.)));
-    app.add_plugins(TerminalCtrlCHandlerPlugin);
-    app.add_event::<bevy_input::keyboard::KeyboardInput>();
-    app.add_plugins(LogPlugin {
-        level: bevy_log::Level::DEBUG,
-        filter: "".to_string(),
-        custom_layer: |_| None,
-    });
-    app.add_systems(Update, smooth_transform);
-    app.run();
+    App::new()
+        .add_plugins((DefaultPlugins
+            .set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(WgpuSettings {
+                    // WARN this is a native only feature. It will not work with webgl or webgpu
+                    features: WgpuFeatures::POLYGON_MODE_LINE,
+                    ..default()
+                }),
+                ..default()
+            })
+            .set(TaskPoolPlugin {
+                task_pool_options: TaskPoolOptions {
+                    async_compute: TaskPoolThreadAssignmentPolicy {
+                        min_threads: 1,
+                        max_threads: 8,
+                        percent: 0.75,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
+                    },
+                    ..default()
+                },
+            }),))
+        .add_plugins(AsyncChunkloaderPlugin)
+        .add_plugins(SunPlugin)
+        .add_plugins(ScannerPlugin)
+        .add_systems(Startup, setup)
+        .add_plugins(ModLoaderPlugin)
+        .add_plugins(NoCameraPlayerPlugin)
+        .add_systems(Update, smooth_transform)
+        .add_plugins(CustomChunkMaterialPlugin)
+        .run();
 }
 
 pub fn setup(
     mut commands: Commands,
+    #[allow(unused)] mut materials: ResMut<Assets<StandardMaterial>>,
+    #[allow(unused)] mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    player::player::new(&mut commands);
     commands.spawn((
         Name::new("Sun"),
-        crate::sun::Sun,
-        /*DirectionalLight {
+        talc::sun::Sun,
+        DirectionalLight {
             illuminance: light_consts::lux::RAW_SUNLIGHT,
             ..default()
-        },*/
+        },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, PI / 2., -PI / 4.)),
     ));
+
+    commands
+        .spawn((
+            Scanner::new(12),
+            Transform::from_xyz(0.0, 200.0, 0.5),
+            Camera3d::default(),
+            FlyCam,
+            Camera {
+                hdr: true,
+                ..default()
+            },
+            Atmosphere {
+                bottom_radius: 5_000.0,
+                top_radius: 64_600.0 * 3.,
+                ground_albedo: Vec3::splat(0.3),
+                rayleigh_density_exp_scale: 1.0 / 8_000.0,
+                rayleigh_scattering: Vec3::new(5.802e-5, 13.558e-5, 33.100e-5),
+                mie_density_exp_scale: 1.0 / 1_200.0,
+                mie_scattering: 3.996e-6,
+                mie_absorption: 0.444e-6,
+                mie_asymmetry: 0.8,
+                ozone_layer_altitude: 25_000.0,
+                ozone_layer_width: 30_000.0,
+                ozone_absorption: Vec3::new(0.650e-6, 1.881e-6, 0.085e-6),
+            },
+            AtmosphereSettings {
+                aerial_view_lut_max_distance: 3.2,
+                scene_units_to_m: 1.,
+                ..Default::default()
+            },
+            //Tonemapping::AgX,
+            Bloom::NATURAL,
+        ))
+        .insert(FlyCam);
 }

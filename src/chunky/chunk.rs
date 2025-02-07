@@ -1,11 +1,11 @@
 use std::sync::OnceLock;
 
-use crate::bevy::prelude::*;
+use bevy::{ecs::query::QueryData, prelude::*};
 use bracket_noise::prelude::*;
 
 use crate::{
     mod_manager::prototypes::{BlockPrototype, BlockPrototypes, Prototypes},
-    position::{ChunkPosition, Position},
+    position::{ChunkPosition, Position, RelativePosition},
 };
 
 /// 32^3 voxels per chunk is a great compromise as it allows each vertex to be only 32 bits when sent to wgsl.
@@ -111,7 +111,7 @@ impl From<usize> for VoxelIndex {
     }
 }
 
-impl From<VoxelIndex> for Position {
+impl From<VoxelIndex> for RelativePosition {
     fn from(value: VoxelIndex) -> Self {
         let x = value.i() % CHUNK_SIZE;
         let y = (value.i() / CHUNK_SIZE) % CHUNK_SIZE;
@@ -120,18 +120,18 @@ impl From<VoxelIndex> for Position {
     }
 }
 
-impl From<Position> for VoxelIndex {
-    fn from(value: Position) -> Self {
+impl From<RelativePosition> for VoxelIndex {
+    fn from(value: RelativePosition) -> Self {
         let x: usize = value
-            .x
+            .x()
             .try_into()
             .expect("[From<RelativePosition> for VoxelIndex] Expected x to be nonnegative.");
         let y: usize = value
-            .y
+            .y()
             .try_into()
             .expect("[From<RelativePosition> for VoxelIndex] Expected y to be nonnegative.");
         let z: usize = value
-            .z
+            .z()
             .try_into()
             .expect("[From<RelativePosition> for VoxelIndex] Expected z to be nonnegative.");
         Self::new(x, y, z)
@@ -179,14 +179,14 @@ impl ChunkData {
     #[must_use]
     pub fn generate(block_prototypes: &BlockPrototypes, chunk_position: ChunkPosition) -> Self {
         // hardcoded extremity check
-        if chunk_position.y * CHUNK_SIZE_I32 > 285 {
+        if chunk_position.y() * CHUNK_SIZE_I32 > 285 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("air").unwrap().id),
                 position: chunk_position,
             };
         }
         // hardcoded extremity check
-        if chunk_position.y * CHUNK_SIZE_I32 < -160 {
+        if chunk_position.y() * CHUNK_SIZE_I32 < -160 {
             return Self {
                 voxels: Voxels::Homogeneous(block_prototypes.get("grass").unwrap().id),
                 position: chunk_position,
@@ -204,13 +204,17 @@ impl ChunkData {
         let grass = block_prototypes.get("grass").unwrap();
 
         let voxels: Box<[ThinBlockPointer; CHUNK_SIZE3]> = std::array::from_fn(|_| {
-            let wx = (x + world_position.x) as f32;
-            let mut wy = (y + world_position.y) as f32 - 200.;
-            let wz = (z + world_position.z) as f32;
+            let wx = (x + world_position.x()) as f32;
+            let mut wy = (y + world_position.y()) as f32 - 200.;
+            let wz = (z + world_position.z()) as f32;
 
             wy += (f32::sin(wx / 100.) + f32::cos(wz / 100.)) * 30.;
 
-            let block_type = if wy > 0.0 { air } else { grass };
+            let block_type = if wy > 0.0 {
+                air
+            } else {
+                grass
+            };
 
             x += 1;
             if x == CHUNK_SIZE_I32 {
@@ -248,9 +252,9 @@ fn index_functions() {
     for z in 0..CHUNK_SIZE_I32 {
         for y in 0..CHUNK_SIZE_I32 {
             for x in 0..CHUNK_SIZE_I32 {
-                let pos = Position::new(x, y, z);
+                let pos = RelativePosition::new(x, y, z);
                 let index: VoxelIndex = pos.into();
-                let from_index: Position = index.into();
+                let from_index: RelativePosition = index.into();
                 assert_eq!(pos, from_index);
             }
         }

@@ -1,6 +1,6 @@
 //! Provides conversions from lua tables into various rust types.
 
-use crate::bevy::prelude::*;
+use bevy::color::Color;
 use mlua::FromLua;
 
 pub(super) struct LuaColor {

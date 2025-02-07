@@ -1,21 +1,22 @@
 use std::{sync::Arc, vec::Drain};
 
-use crate::bevy::prelude::*;
+use bevy::{
+    math::VectorSpace,
+    platform_support::collections::HashMap,
+    prelude::*,
+    render::primitives::Aabb,
+    tasks::{AsyncComputeTaskPool, Task, block_on},
+};
 
-use crate::chunky::{
+use crate::{chunky::{
     chunk::{
-        CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32,
-        ChunkData,
+        ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32
     },
     lod::Lod,
-};
-use crate::frustrum_culling::aabb::Aabb;
+}, render::chunk_material::{ChunkMaterial, RenderableChunk}};
 use crate::mod_manager::prototypes::BlockPrototypes;
 use crate::position::{ChunkPosition, FloatingPosition};
-use crate::render::chunk_material::BakedChunkMesh;
-use crate::render::wgpu_context::RenderDevice;
 use crate::{player::render_distance::Scanner, smooth_transform::SmoothTransformTo};
-use bevy_utils::HashMap;
 use futures_lite::future;
 
 use super::{chunk::Chunk, chunks_refs::ChunkRefs, greedy_mesher_optimized};
@@ -52,7 +53,7 @@ pub struct AsyncChunkloader {
     pub load_mesh_queue: Vec<ChunkRefs>,
     pub unload_mesh_queue: Vec<ChunkPosition>,
     pub worldgen_tasks: HashMap<ChunkPosition, Task<ChunkData>>,
-    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<BakedChunkMesh>>>,
+    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<Mesh>>>,
 }
 
 impl AsyncChunkloader {
@@ -67,8 +68,8 @@ impl AsyncChunkloader {
             .max(0) as usize;
 
         self.load_chunk_queue.sort_by(|a, b| {
-            a.distance_squared(*player_chunk_position)
-                .cmp(&b.distance_squared(*player_chunk_position))
+            a.0.distance_squared(player_chunk_position.0)
+                .cmp(&b.0.distance_squared(player_chunk_position.0))
         });
 
         self.load_chunk_queue.drain(0..tasks_left)
@@ -87,10 +88,12 @@ impl AsyncChunkloader {
 
         self.load_mesh_queue.sort_by(|a, b| {
             a.center_chunk_position
-                .distance_squared(*player_chunk_position)
+                .0
+                .distance_squared(player_chunk_position.0)
                 .cmp(
                     &b.center_chunk_position
-                        .distance_squared(*player_chunk_position),
+                        .0
+                        .distance_squared(player_chunk_position.0),
                 )
         });
 
@@ -122,13 +125,11 @@ fn spawn_chunk_as_bevy_entity(
             FloatingPosition::new(0., -CHUNK_INITIAL_Y_OFFSET, 0.),
             CHUNK_FLOAT_UP_BLOCKS_PER_SECOND,
         ),
-        Aabb::from_min_max(
-            Vec3::ZERO,
-            Vec3::new(CHUNK_SIZE_F32, CHUNK_SIZE_F32, CHUNK_SIZE_F32),
-        ),
+        Aabb::from_min_max(Vec3::ZERO, Vec3::splat(CHUNK_SIZE_F32)),
         Transform::from_translation(
-            *(FloatingPosition::from(chunk_position)
-                + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.)),
+            (FloatingPosition::from(chunk_position)
+                + FloatingPosition::new(0., CHUNK_INITIAL_Y_OFFSET, 0.))
+            .0,
         ),
     ));
 
@@ -145,7 +146,7 @@ fn start_worldgen_threads(
 ) {
     let task_pool = AsyncComputeTaskPool::get();
     let scanner = scanners.single();
-    let player_position = scanner.translation().into();
+    let player_position = FloatingPosition(scanner.translation());
 
     let to_load: Vec<ChunkPosition> = chunkloader.get_chunks_to_load(player_position).collect();
     for chunk_position in to_load {
@@ -182,22 +183,16 @@ fn join_worldgen_threads(
 fn start_mesh_threads(
     mut chunkloader: ResMut<AsyncChunkloader>,
     scanners: Query<&GlobalTransform, With<Scanner>>,
-    render_device: Res<RenderDevice>
 ) {
     let task_pool = AsyncComputeTaskPool::get();
     let scanner = scanners.single();
-    let player_position = scanner.translation().into();
+    let player_position = FloatingPosition(scanner.translation());
 
     let to_mesh: Vec<ChunkRefs> = chunkloader.get_chunks_to_mesh(player_position).collect();
     for chunk_refs in to_mesh {
         let k = chunk_refs.center_chunk_position;
-        let cloned_render_device = render_device.clone(); // its an arc, this is cheap.
         let task = task_pool.spawn(async move {
-            greedy_mesher_optimized::build_chunk_instance_data(
-                cloned_render_device,
-                &chunk_refs,
-                super::lod::Lod::default(),
-            )
+            greedy_mesher_optimized::build_chunk_mesh(&chunk_refs, super::lod::Lod::default())
         });
         chunkloader.mesh_tasks.insert(k, task);
     }
@@ -207,6 +202,7 @@ fn start_mesh_threads(
 fn join_mesh_threads(
     mut chunkloader: ResMut<AsyncChunkloader>,
     chunk_canididates: Query<(Entity, &Chunk)>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut commands: Commands,
 ) {
     chunkloader.mesh_tasks.retain(|chunk_position, task| {
@@ -214,17 +210,25 @@ fn join_mesh_threads(
         let status = block_on(future::poll_once(task));
 
         // keep the entry in our task vector only if the task is not done yet
-        let Some(baked_chunk_mesh_optional) = status else {
+        let Some(mesh_option) = status else {
             return true;
         };
 
         // if this task is done, handle the data it returned!
-        if let Some(baked_chunk_mesh) = baked_chunk_mesh_optional {
+        if let Some(mesh) = mesh_option {
+            let mesh_handle = Mesh3d(meshes.add(mesh));
+
             // todo: refactor to use bevy indexes when the update drops.
             for (entity_id, chunk) in chunk_canididates.iter() {
                 if chunk.position == *chunk_position {
                     if let Some(mut entity_commands) = commands.get_entity(entity_id) {
-                        entity_commands.insert(baked_chunk_mesh);
+                        entity_commands.insert(RenderableChunk{
+                            mesh: mesh_handle,
+                            chunk_material: ChunkMaterial{
+                                instance_data: vec![],
+                                chunk_position: *chunk_position
+                            }
+                        });
                         break;
                     }
                 }
@@ -272,7 +276,7 @@ fn unload_meshes(
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
                 if let Some(mut entity_commands) = commands.get_entity(entity_id) {
-                    entity_commands.remove::<BakedChunkMesh>();
+                    entity_commands.remove::<Mesh3d>();
                     break;
                 }
             }

@@ -1,8 +1,8 @@
-use crate::bevy::prelude::*;
+use bevy::prelude::*;
 
 use crate::{
     chunky::chunk::CHUNK_SIZE_I32,
-    position::{ChunkPosition, Position},
+    position::{ChunkPosition, RelativePosition},
 };
 
 #[inline]
@@ -26,28 +26,49 @@ pub const fn index_to_ivec3_bounds_reverse(i: i32, bounds: i32) -> IVec3 {
 /// if lying on the edge of a chunk, return the edging chunk's offset.
 #[inline]
 #[must_use]
-pub fn get_edging_chunk(pos: Position) -> Option<ChunkPosition> {
+pub fn get_edging_chunk(pos: RelativePosition) -> Option<ChunkPosition> {
     let mut chunk_dir = IVec3::ZERO;
-    if pos.x == 0 {
+    if pos.x() == 0 {
         chunk_dir.x = -1;
-    } else if pos.x == CHUNK_SIZE_I32 - 1 {
+    } else if pos.x() == CHUNK_SIZE_I32 - 1 {
         chunk_dir.x = 1;
     }
-    if pos.y == 0 {
+    if pos.y() == 0 {
         chunk_dir.y = -1;
-    } else if pos.y == CHUNK_SIZE_I32 - 1 {
+    } else if pos.y() == CHUNK_SIZE_I32 - 1 {
         chunk_dir.y = 1;
     }
-    if pos.z == 0 {
+    if pos.z() == 0 {
         chunk_dir.z = -1;
-    } else if pos.z == CHUNK_SIZE_I32 - 1 {
+    } else if pos.z() == CHUNK_SIZE_I32 - 1 {
         chunk_dir.z = 1;
     }
     if chunk_dir == IVec3::ZERO {
         None
     } else {
-        Some(chunk_dir.into())
+        Some(ChunkPosition(chunk_dir))
     }
+}
+
+// pos 18 bits, ao 3 bits, normal 4 bits
+// 18-21-25-   left 32-25 = 7
+#[inline]
+#[must_use]
+pub const fn make_vertex_u32(
+    // position: [i32; 3], /*, normal: i32, color: Color, texture_id: u32*/
+    pos: IVec3, /*, normal: i32, color: Color, texture_id: u32*/
+    ao: u32,
+    normal: u32,
+    block_type: u32,
+) -> u32 {
+    pos.x as u32
+        | ((pos.y as u32) << 6u32)
+        | ((pos.z as u32) << 12u32)
+        | (ao << 18u32)
+        | (normal << 21u32)
+        | (block_type << 25u32)
+    // | (normal as u32) << 18u32
+    // | (texture_id) << 21u32
 }
 
 /// generate a vec of indices

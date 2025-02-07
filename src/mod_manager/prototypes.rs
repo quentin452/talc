@@ -4,8 +4,9 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Iter;
 
-use crate::bevy::prelude::*;
 use anyhow::Context;
+use bevy::color::Color;
+use bevy::prelude::*;
 use mlua::FromLua;
 
 use super::lua_conversions::LuaColor;

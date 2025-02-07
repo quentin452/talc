@@ -1,25 +1,46 @@
-use crate::bevy::prelude::*;
-use crate::chunky::chunk::CHUNK_SIZE_I32;
 use std::ops::{Add, Div, Mul, Sub};
 
-/// A grid aligned position in the world using absolute or relative coordinates.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, Deref)]
-pub struct Position(IVec3);
+use bevy::math::{IVec3, Vec3};
+
+use crate::chunky::chunk::CHUNK_SIZE_I32;
+
+/// A grid aligned position in the world using absolute coordinates.
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
+pub struct Position(pub IVec3);
+
+/// A grid aligned position in the world using relative coordinates.
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
+pub struct RelativePosition(pub IVec3);
 
 /// A floating point position in the world.
-#[derive(Debug, Clone, Copy, Deref)]
-pub struct FloatingPosition(Vec3);
+#[derive(Debug, Clone, Copy)]
+pub struct FloatingPosition(pub Vec3);
 
 /// Represents the location of a chunk.
 /// The x, y, z components are scaled down by a factor of `chunk::CHUNK_SIZE`
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, Deref)]
-pub struct ChunkPosition(IVec3);
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
+pub struct ChunkPosition(pub IVec3);
 
 impl Position {
     #[must_use]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3 { x, y, z })
     }
+
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn x(&self) -> i32 { self.0.x }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn y(&self) -> i32 { self.0.y }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn z(&self) -> i32 { self.0.z }
+}
+
+impl RelativePosition {
+    #[must_use]
+    pub const fn new(x: i32, y: i32, z: i32) -> Self {
+        Self(IVec3 { x, y, z })
+    }
+
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn x(&self) -> i32 { self.0.x }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn y(&self) -> i32 { self.0.y }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn z(&self) -> i32 { self.0.z }
 }
 
 impl FloatingPosition {
@@ -27,6 +48,10 @@ impl FloatingPosition {
     pub const fn new(x: f32, y: f32, z: f32) -> Self {
         Self(Vec3 { x, y, z })
     }
+
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn x(&self) -> f32 { self.0.x }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn y(&self) -> f32 { self.0.y }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn z(&self) -> f32 { self.0.z }
 }
 
 impl ChunkPosition {
@@ -34,24 +59,10 @@ impl ChunkPosition {
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3 { x, y, z })
     }
-}
 
-impl From<IVec3> for Position {
-    fn from(value: IVec3) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Vec3> for FloatingPosition {
-    fn from(value: Vec3) -> Self {
-        Self(value)
-    }
-}
-
-impl From<IVec3> for ChunkPosition {
-    fn from(value: IVec3) -> Self {
-        Self(value)
-    }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn x(&self) -> i32 { self.0.x }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn y(&self) -> i32 { self.0.y }
+    #[rustfmt::skip] #[inline] #[must_use]    pub const fn z(&self) -> i32 { self.0.z }
 }
 
 impl From<Position> for ChunkPosition {
@@ -144,4 +155,5 @@ macro_rules! impl_arithmetic_ops {
 
 impl_arithmetic_ops!(Position);
 impl_arithmetic_ops!(ChunkPosition);
+impl_arithmetic_ops!(RelativePosition);
 impl_arithmetic_ops!(FloatingPosition);

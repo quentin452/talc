@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::bevy::prelude::*;
+use bevy::prelude::*;
 
 pub const DAY_TIME_SEC: f32 = 60.0;
 pub const NIGHT_TIME_SEC: f32 = 10.0;
@@ -33,7 +33,7 @@ impl Plugin for SunPlugin {
 
 #[allow(clippy::needless_pass_by_value)]
 fn daylight_cycle(
-    mut query: Query<(&mut Transform, &mut Sun)>,
+    mut query: Query<(&mut Transform, &mut DirectionalLight), With<Sun>>,
     mut timer: ResMut<SkyTime>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
@@ -59,8 +59,9 @@ fn daylight_cycle(
     let night = ((timer.0 - DAY_TIME_SEC) / NIGHT_TIME_SEC).max(0.0);
     let percent = day.mul_add(std::f32::consts::PI, night * std::f32::consts::PI);
 
-    for (mut light_trans, _sun) in &mut query {
+    for (mut light_trans, mut directional) in &mut query {
         light_trans.rotation = Quat::from_rotation_x(-percent.sin().atan2(percent.cos()));
-        //sun.illuminance = percent.sin().max(0.0).powi(2) * 4000.;
+        directional.illuminance =
+            percent.sin().max(0.0).powi(2) * light_consts::lux::AMBIENT_DAYLIGHT * 0.4;
     }
 }

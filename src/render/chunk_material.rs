@@ -7,51 +7,39 @@
 //! implementation using bevy's low level rendering api.
 //! It's generally recommended to try the built-in instancing before going with this approach.
 
+use std::sync::Arc;
+
 use bevy::{
-    core_pipeline::core_3d::{Transparent3d, CORE_3D_DEPTH_FORMAT},
-    ecs::system::{lifetimeless::*, SystemParamItem},
+    core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Transparent3d},
+    ecs::system::{SystemParamItem, lifetimeless::*},
     pbr::{
-        MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup
+        MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, RenderMeshInstances,
+        SetMeshBindGroup, SetMeshViewBindGroup,
     },
     prelude::*,
     render::{
-        view::{self, ExtractedView, RenderVisibleEntities, ViewTarget, VisibilityClass},
-        extract_component::{ExtractComponent, ExtractComponentPlugin}, mesh::{
-            allocator::MeshAllocator, MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, RenderMeshBufferInfo
-        }, render_asset::RenderAssets, render_phase::{
+        Render, RenderApp, RenderSet,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        mesh::{
+            MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, RenderMeshBufferInfo,
+            allocator::MeshAllocator,
+        },
+        render_asset::RenderAssets,
+        render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
             RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-        }, render_resource::*, renderer::RenderDevice, Render, RenderApp, RenderSet
+        },
+        render_resource::*,
+        renderer::RenderDevice,
+        view::{self, ExtractedView, RenderVisibleEntities, ViewTarget, VisibilityClass},
     },
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::position::ChunkPosition;
+use crate::position::{ChunkPosition, RelativePosition};
 
 /// This example uses a shader source file from the assets subdirectory
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
-
-
-/// A marker component that represents an entity that is to be rendered using
-/// our specialized pipeline.
-///
-/// Note the [`ExtractComponent`] trait implementation: this is necessary to
-/// tell Bevy that this object should be pulled into the render world. Also note
-/// the `on_add` hook, which is needed to tell Bevy's `check_visibility` system
-/// that entities with this component need to be examined for visibility.
-#[derive(Clone, Component, ExtractComponent)]
-#[require(VisibilityClass)]
-#[component(on_add = view::add_visibility_class::<ChunkMaterial>)]
-pub struct ChunkMaterial {
-    pub instance_data: Vec<ChunkInstanceData>,
-    pub chunk_position: ChunkPosition
-}
-
-#[derive(Bundle)]
-pub struct RenderableChunk {
-    pub chunk_material: ChunkMaterial,
-    pub mesh: Mesh3d
-}
 
 // When writing custom rendering code it's generally recommended to use a plugin.
 // The main reason for this is that it gives you access to the finish() hook
@@ -59,7 +47,7 @@ pub struct RenderableChunk {
 pub struct CustomChunkMaterialPlugin;
 impl Plugin for CustomChunkMaterialPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractComponentPlugin::<ChunkMaterial>::default());
+        app.add_plugins(ExtractComponentPlugin::<RenderableChunk>::default());
 
         // We make sure to add these to the render app, not the main app.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -87,19 +75,147 @@ impl Plugin for CustomChunkMaterialPlugin {
     }
 }
 
-/// This struct contains constant data for each chunk. It is accessible for every vertex in the chunk.
+/// In talc we draw quads instead of triangles.
+/// This struct repersents bit packed data for each quad ready to be sent to the GPU.
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct ChunkInstanceData {
-    pub chunk_position: IVec3,
+pub struct PackedQuad {
+    /// Repersents bit-packed instance data for every quad.
+    /// FORMAT
+    /// x: 00000 (5)
+    /// y: 00000 (10)
+    /// z: 00000 (15)
+    /// normal: 000 (18)
+    /// ao: 00 (20)
+    /// x strech: 00000 (25)
+    /// y strech: 00000 (30)
+    /// 2 bits are free :)
+    packed_u32: u32,
 }
 
-/// Bufferized and GPU-ready version of the above^ struct.
+impl PackedQuad {
+    #[inline]
+    #[must_use]
+    pub fn new(
+        position: RelativePosition,
+        normal: u32,
+        ao: u32,
+        x_strech: u32,
+        y_strech: u32,
+    ) -> PackedQuad {
+        let x = position.x();
+        let y = position.y();
+        let z = position.z();
+
+        let ao = 0; // todo
+        let x_strech = x_strech.min(31);
+        let y_strech = y_strech.min(31);
+
+        #[rustfmt::skip]
+        {
+            debug_assert!(0 <= position.x() && position.x() < 32, "x position out of range. expected 0..=31, got {x}");
+            debug_assert!(0 <= position.y() && position.y() < 32, "y position out of range. expected 0..=31, got {y}");
+            debug_assert!(0 <= position.z() && position.z() < 32, "z position out of range. expected 0..=31, got {z}");
+            debug_assert!(normal < 6, "normal out of range. expected 0..=6, got {normal}");
+            debug_assert!(ao < 4, "ao out of range. expected 0..=3, got {ao}");
+            debug_assert!(x_strech < 32, "x strech out of range. expected 0..=31, got {x_strech}");
+            debug_assert!(y_strech < 32, "y strech out of range. expected 0..=31, got {y_strech}");
+        }
+
+        let packed_u32: u32 = x as u32
+            | ((y as u32) << 5u32)
+            | ((z as u32) << 10u32)
+            | (normal << 15u32)
+            | (ao << 18u32)
+            | (x_strech << 20u32)
+            | (y_strech << 25u32);
+
+        Self { packed_u32 }
+    }
+}
+
+/// Note the [`ExtractComponent`] trait implementation: this is necessary to
+/// tell Bevy that this object should be pulled into the render world. Also note
+/// the `on_add` hook, which is needed to tell Bevy's `check_visibility` system
+/// that entities with this component need to be examined for visibility.
+#[derive(Clone, Component, ExtractComponent, Deref)]
+#[require(VisibilityClass)]
+#[component(on_add = view::add_visibility_class::<RenderableChunk>)]
+pub struct RenderableChunk(pub Arc<ChunkMaterial>);
+
+/// This struct does not exist in render world.
+/// It is trivally converted to `ChunkInstanceBuffer` when passed to render world via the `prepare_instance_buffers` system.
+pub struct ChunkMaterial {
+    pub quads: Vec<PackedQuad>,
+    pub chunk_position: ChunkPosition,
+}
+
+/// Bufferized and GPU-ready version of a chunk.
+/// Each chunk in the render world ECS holds one of these.
 #[derive(Component)]
 struct ChunkInstanceBuffer {
-    instance_buffer: Buffer,
+    buffer: Buffer,
     uniform_bind_group: BindGroup,
-    length: usize
+    length: usize,
+    simple_quad_index_buffer: SimpleQuadIndexBuffer,
+}
+
+impl ChunkInstanceBuffer {
+    pub fn new(
+        render_device: &RenderDevice,
+        chunk_material: &ChunkMaterial,
+        bind_group_layout: &BindGroupLayout,
+    ) -> Self {
+        let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("chunk per-instance data buffer"),
+            contents: bytemuck::cast_slice(chunk_material.quads.as_slice()),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("chunk uniform buffer"),
+            contents: bytemuck::cast_slice(&chunk_material.chunk_position.0.to_array()),
+            usage: BufferUsages::UNIFORM,
+        });
+        let uniform_bind_group =
+            render_device.create_bind_group("chunk bind group", &bind_group_layout, &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::Buffer(BufferBinding {
+                        buffer: &uniform_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+            ]);
+        let index_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("generic quad index buffer"),
+            contents: bytemuck::cast_slice(&[0, 1, 2, 3, 2, 1]),
+            usage: BufferUsages::INDEX,
+        });
+        let simple_quad_index_buffer = SimpleQuadIndexBuffer {
+            buffer: index_buffer,
+            length: 6,
+        };
+        ChunkInstanceBuffer {
+            buffer: instance_buffer,
+            uniform_bind_group,
+            length: chunk_material.quads.len(),
+            simple_quad_index_buffer,
+        }
+    }
+}
+
+fn prepare_instance_buffers(
+    mut commands: Commands,
+    query: Query<(Entity, &RenderableChunk)>,
+    render_device: Res<RenderDevice>,
+    bind_group_layout: Res<ChunkUniformBufferBindGroupLayout>,
+) {
+    for (render_entity, renderable_chunk) in &query {
+        let instance_buffer =
+            ChunkInstanceBuffer::new(&render_device, &renderable_chunk.0, &bind_group_layout);
+        commands.entity(render_entity).insert(instance_buffer);
+    }
 }
 
 #[derive(Resource, Deref, Clone)]
@@ -108,53 +224,20 @@ struct ChunkUniformBufferBindGroupLayout(BindGroupLayout);
 impl FromWorld for ChunkUniformBufferBindGroupLayout {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
-        let bind_group_layout = render_device.create_bind_group_layout(
-            "chunk uniform buffer bind ground layout",
-            &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
-                count: None,
-            }]
-        );
+        let bind_group_layout =
+            render_device.create_bind_group_layout("chunk uniform buffer bind ground layout", &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ]);
         ChunkUniformBufferBindGroupLayout(bind_group_layout)
-    }
-}
-
-fn prepare_instance_buffers(
-    mut commands: Commands,
-    query: Query<(Entity, &ChunkMaterial)>,
-    render_device: Res<RenderDevice>,
-    bind_group_layout: Res<ChunkUniformBufferBindGroupLayout>
-) {
-    for (entity, chunk_instance_data) in &query {
-        let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("chunk per-instance data buffer"),
-            contents: bytemuck::cast_slice(chunk_instance_data.instance_data.as_slice()),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
-        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("chunk uniform buffer"),
-            contents: bytemuck::cast_slice(&chunk_instance_data.chunk_position.0.to_array()),
-            usage: BufferUsages::UNIFORM,
-        });
-        let uniform_bind_group = render_device.create_bind_group(
-            "chunk bind group",
-            &bind_group_layout,
-            &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Buffer(BufferBinding {
-                    buffer: &uniform_buffer,
-                    offset: 0,
-                    size: None
-                })
-            }]
-        );
-        commands.entity(entity).insert(ChunkInstanceBuffer {
-            instance_buffer,
-            uniform_bind_group,
-            length: chunk_instance_data.instance_data.len(),
-        });
     }
 }
 
@@ -187,13 +270,15 @@ fn queue_custom_mesh_pipeline(
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
-        for &(render_entity, visible_entity) in view_visible_entities.get::<ChunkMaterial>().iter() {
+        for &(render_entity, visible_entity) in
+            view_visible_entities.get::<ChunkInstanceBuffer>().iter()
+        {
             // Get the mesh instance
             let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(visible_entity)
             else {
                 continue;
             };
-            
+
             // Get the mesh data
             let Some(mesh) = meshes.get(mesh_instance.mesh_asset_id) else {
                 continue;
@@ -227,10 +312,16 @@ fn queue_custom_mesh_pipeline(
 }
 
 #[derive(Resource)]
+struct SimpleQuadIndexBuffer {
+    buffer: Buffer,
+    length: u32,
+}
+
+#[derive(Resource)]
 struct CustomPipeline {
     shader_handle: Handle<Shader>,
     mesh_pipeline: MeshPipeline,
-    bind_group_layout: ChunkUniformBufferBindGroupLayout
+    bind_group_layout: ChunkUniformBufferBindGroupLayout,
 }
 
 impl FromWorld for CustomPipeline {
@@ -242,7 +333,7 @@ impl FromWorld for CustomPipeline {
         CustomPipeline {
             shader_handle: world.load_asset(SHADER_ASSET_PATH),
             mesh_pipeline: mesh_pipeline.clone(),
-            bind_group_layout: bind_group_layout.clone()
+            bind_group_layout: bind_group_layout.clone(),
         }
     }
 }
@@ -278,7 +369,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
         let vertex_buffer_layout = layout
             .0
             .get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
-        
+
         Ok(RenderPipelineDescriptor {
             label: Some("Specialized Mesh Pipeline".into()),
             layout: vec![
@@ -289,7 +380,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                 // Bind group 1 is the mesh uniform
                 self.mesh_pipeline.mesh_layouts.model_only.clone(),
                 // Bind group 2 is our custom chunk uniform.
-                self.bind_group_layout.0.clone()
+                self.bind_group_layout.0.clone(),
             ],
             push_constant_ranges: vec![],
             vertex: VertexState {
@@ -361,55 +452,27 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
         item: &P,
         _view: (),
         instance_buffer: Option<&'w ChunkInstanceBuffer>,
-        (meshes, render_mesh_instances, mesh_allocator): SystemParamItem<'w, '_, Self::Param>,
+        (): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        // A borrow check workaround.
-        let mesh_allocator = mesh_allocator.into_inner();
-
-        let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(item.main_entity())
-        else {
-            return RenderCommandResult::Skip;
-        };
-        let Some(gpu_mesh) = meshes.into_inner().get(mesh_instance.mesh_asset_id) else {
-            return RenderCommandResult::Skip;
-        };
         let Some(instance_buffer) = instance_buffer else {
-            return RenderCommandResult::Skip;
-        };
-        let Some(vertex_buffer_slice) =
-            mesh_allocator.mesh_vertex_slice(&mesh_instance.mesh_asset_id)
-        else {
             return RenderCommandResult::Skip;
         };
 
         pass.set_bind_group(2, &instance_buffer.uniform_bind_group, &[]);
         pass.set_vertex_buffer(0, vertex_buffer_slice.buffer.slice(..));
         //pass.set_vertex_buffer(1, instance_buffer.instance_buffer.slice(..));
-
-        match &gpu_mesh.buffer_info {
-            RenderMeshBufferInfo::Indexed {
-                index_format,
-                count,
-            } => {
-                let Some(index_buffer_slice) =
-                    mesh_allocator.mesh_index_slice(&mesh_instance.mesh_asset_id)
-                else {
-                    return RenderCommandResult::Skip;
-                };
-
-                pass.set_index_buffer(index_buffer_slice.buffer.slice(..), 0, *index_format);
-                pass.draw_indexed(
-                    index_buffer_slice.range.start..(index_buffer_slice.range.start + count),
-                    vertex_buffer_slice.range.start as i32,
-                    //0..instance_buffer.length as u32,
-                    0..1u32,
-                );
-            }
-            RenderMeshBufferInfo::NonIndexed => {
-                pass.draw(vertex_buffer_slice.range, 0..instance_buffer.length as u32);
-            }
-        }
+        
+        pass.set_index_buffer(
+            instance_buffer.simple_quad_index_buffer.buffer.slice(..),
+            0,
+            IndexFormat::Uint32
+        );
+        pass.draw_indexed(
+            0..instance_buffer.simple_quad_index_buffer.length,
+            vertex_buffer_slice.range.start as i32,
+            0..instance_buffer.length as u32,
+        );
         RenderCommandResult::Success
     }
 }

@@ -1,17 +1,9 @@
-use std::collections::VecDeque;
-
-use bevy::{
-    asset::RenderAssetUsages,
-    platform_support::collections::HashMap,
-    prelude::*,
-    render::mesh::{Indices, PrimitiveTopology},
-};
+use bevy::{platform_support::collections::HashMap, prelude::*};
 
 use crate::{
     mod_manager::prototypes::BlockPrototype,
     position::RelativePosition,
-    render::chunk_material::ATTRIBUTE_VOXEL,
-    utils::{generate_indices, make_vertex_u32},
+    render::chunk_material::{ChunkMaterial, PackedQuad},
 };
 
 use super::{
@@ -139,7 +131,7 @@ fn calculate_ao(
 }
 
 #[must_use]
-pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
+pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<ChunkMaterial> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
@@ -208,9 +200,9 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
 
     let data = calculate_ao(chunks_refs, &axis_cols);
 
-    let mut vertices: Vec<u32> = vec![];
+    let mut quads: Vec<PackedQuad> = vec![];
     for (axis, block_ao_data) in data.into_iter().enumerate() {
-        let facedir = match axis {
+        let face_dir = match axis {
             0 => FaceDir::Down,
             1 => FaceDir::Up,
             2 => FaceDir::Left,
@@ -220,121 +212,43 @@ pub fn build_chunk_mesh(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Mesh> {
         };
         for (block_ao, axis_plane) in block_ao_data {
             let ao = block_ao & 0b111111111;
-            let block_type = block_ao >> 9;
             for (axis_pos, plane) in axis_plane {
-                let quads_from_axis = greedy_mesh_binary_plane(plane, lod.size() as u32);
-
-                for q in quads_from_axis {
-                    q.append_vertices(
-                        &mut vertices,
-                        facedir,
-                        axis_pos,
-                        Lod::default(),
+                for greedy_quad in greedy_mesh_binary_plane(plane, lod.size() as u32) {
+                    let axis = axis_pos as i32;
+                    let packed_quad = PackedQuad::new(
+                        face_dir.world_to_sample(
+                            axis,
+                            greedy_quad.x as i32,
+                            greedy_quad.y as i32,
+                            lod,
+                        ),
+                        face_dir.normal_index(),
                         ao,
-                        block_type,
+                        greedy_quad.h,
+                        greedy_quad.w,
                     );
+                    quads.push(packed_quad);
                 }
             }
         }
     }
 
-    if vertices.is_empty() {
+    if quads.is_empty() {
         return None;
     }
 
-    let mut bevy_mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    let vertex_count = vertices.len();
-    bevy_mesh.insert_attribute(ATTRIBUTE_VOXEL, vertices);
-    bevy_mesh.insert_indices(Indices::U32(generate_indices(vertex_count)));
-    Some(bevy_mesh)
+    Some(ChunkMaterial {
+        quads,
+        chunk_position: chunks_refs.center_chunk_position,
+    })
 }
 
-// todo: compress further?
 #[derive(Debug)]
 pub struct GreedyQuad {
     pub x: u32,
     pub y: u32,
     pub w: u32,
     pub h: u32,
-}
-
-impl GreedyQuad {
-    /// compress this quad data into the input vertices vec
-    pub fn append_vertices(
-        &self,
-        vertices: &mut Vec<u32>,
-        face_dir: FaceDir,
-        axis: u32,
-        lod: Lod,
-        ao: u32,
-        block_type: u32,
-    ) {
-        // let negate_axis = face_dir.negate_axis();
-        // let axis = axis as i32 + negate_axis;
-        let axis = axis as i32;
-        let jump = lod.jump_index();
-
-        // pack ambient occlusion strength into vertex
-        let v1ao = (ao & 1) + ((ao >> 1) & 1) + ((ao >> 3) & 1);
-        let v2ao = ((ao >> 3) & 1) + ((ao >> 6) & 1) + ((ao >> 7) & 1);
-        let v3ao = ((ao >> 5) & 1) + ((ao >> 8) & 1) + ((ao >> 7) & 1);
-        let v4ao = ((ao >> 1) & 1) + ((ao >> 2) & 1) + ((ao >> 5) & 1);
-
-        let v1 = make_vertex_u32(
-            face_dir.world_to_sample(axis, self.x as i32, self.y as i32, lod) * jump,
-            v1ao,
-            face_dir.normal_index(),
-            block_type,
-        );
-        let v2 = make_vertex_u32(
-            face_dir.world_to_sample(axis, self.x as i32 + self.w as i32, self.y as i32, lod)
-                * jump,
-            v2ao,
-            face_dir.normal_index(),
-            block_type,
-        );
-        let v3 = make_vertex_u32(
-            face_dir.world_to_sample(
-                axis,
-                self.x as i32 + self.w as i32,
-                self.y as i32 + self.h as i32,
-                lod,
-            ) * jump,
-            v3ao,
-            face_dir.normal_index(),
-            block_type,
-        );
-        let v4 = make_vertex_u32(
-            face_dir.world_to_sample(axis, self.x as i32, self.y as i32 + self.h as i32, lod)
-                * jump,
-            v4ao,
-            face_dir.normal_index(),
-            block_type,
-        );
-
-        // the quad vertices to be added
-        let mut new_vertices = VecDeque::from([v1, v2, v3, v4]);
-
-        // triangle vertex order is different depending on the facing direction
-        // due to indices always being the same
-        if face_dir.reverse_order() {
-            // keep first index, but reverse the rest
-            let o = new_vertices.split_off(1);
-            o.into_iter().rev().for_each(|i| new_vertices.push_back(i));
-        }
-
-        // anisotropy flip
-        if (v1ao > 0) ^ (v3ao > 0) {
-            // right shift array, to swap triangle intersection angle
-            let f = new_vertices.pop_front().unwrap();
-            new_vertices.push_back(f);
-        }
-
-        vertices.extend(new_vertices);
-    }
 }
 
 /// generate quads of a binary slice

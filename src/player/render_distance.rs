@@ -63,7 +63,7 @@ impl Scanner {
         let mesh_distance = distance;
         // This is +1 becuase meshes require all adjacent chunks loaded in a 3x3x3 area before they can be meshed.
         let worldgen_distance = distance + 1;
-        
+
         Self {
             worldgen_sampling_offsets: make_offset_vec(worldgen_distance),
             mesh_sampling_offsets: make_offset_vec(mesh_distance),

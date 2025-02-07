@@ -1,7 +1,6 @@
 use std::{sync::Arc, vec::Drain};
 
 use bevy::{
-    math::VectorSpace,
     platform_support::collections::HashMap,
     prelude::*,
     render::primitives::Aabb,
@@ -13,9 +12,9 @@ use crate::{chunky::{
         ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32
     },
     lod::Lod,
-}, render::chunk_material::{ChunkMaterial, RenderableChunk}};
-use crate::mod_manager::prototypes::BlockPrototypes;
+}, render::chunk_material::RenderableChunk};
 use crate::position::{ChunkPosition, FloatingPosition};
+use crate::{mod_manager::prototypes::BlockPrototypes, render::chunk_material::ChunkMaterial};
 use crate::{player::render_distance::Scanner, smooth_transform::SmoothTransformTo};
 use futures_lite::future;
 
@@ -53,7 +52,7 @@ pub struct AsyncChunkloader {
     pub load_mesh_queue: Vec<ChunkRefs>,
     pub unload_mesh_queue: Vec<ChunkPosition>,
     pub worldgen_tasks: HashMap<ChunkPosition, Task<ChunkData>>,
-    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<Mesh>>>,
+    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<ChunkMaterial>>>,
 }
 
 impl AsyncChunkloader {
@@ -192,7 +191,10 @@ fn start_mesh_threads(
     for chunk_refs in to_mesh {
         let k = chunk_refs.center_chunk_position;
         let task = task_pool.spawn(async move {
-            greedy_mesher_optimized::build_chunk_mesh(&chunk_refs, super::lod::Lod::default())
+            greedy_mesher_optimized::build_chunk_instance_data(
+                &chunk_refs,
+                super::lod::Lod::default(),
+            )
         });
         chunkloader.mesh_tasks.insert(k, task);
     }
@@ -202,7 +204,6 @@ fn start_mesh_threads(
 fn join_mesh_threads(
     mut chunkloader: ResMut<AsyncChunkloader>,
     chunk_canididates: Query<(Entity, &Chunk)>,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut commands: Commands,
 ) {
     chunkloader.mesh_tasks.retain(|chunk_position, task| {
@@ -210,25 +211,18 @@ fn join_mesh_threads(
         let status = block_on(future::poll_once(task));
 
         // keep the entry in our task vector only if the task is not done yet
-        let Some(mesh_option) = status else {
+        let Some(instance_data_optional) = status else {
             return true;
         };
 
         // if this task is done, handle the data it returned!
-        if let Some(mesh) = mesh_option {
-            let mesh_handle = Mesh3d(meshes.add(mesh));
-
+        if let Some(instance_data) = instance_data_optional {
             // todo: refactor to use bevy indexes when the update drops.
             for (entity_id, chunk) in chunk_canididates.iter() {
                 if chunk.position == *chunk_position {
                     if let Some(mut entity_commands) = commands.get_entity(entity_id) {
-                        entity_commands.insert(RenderableChunk{
-                            mesh: mesh_handle,
-                            chunk_material: ChunkMaterial{
-                                instance_data: vec![],
-                                chunk_position: *chunk_position
-                            }
-                        });
+                        let renderable_chunk = RenderableChunk(Arc::new(instance_data));
+                        entity_commands.insert(renderable_chunk);
                         break;
                     }
                 }

@@ -11,7 +11,6 @@ use crate::{
 use super::{
     async_chunkloader::Chunks,
     chunk::{CHUNK_SIZE, CHUNK_SIZE_I32, ChunkData, VoxelIndex},
-    constants::ADJACENT_CHUNK_DIRECTIONS,
     quad::Direction,
 };
 

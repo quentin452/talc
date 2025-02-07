@@ -1,3 +1,8 @@
+mod bevy_winit_event_converters;
+use bevy_app::PluginsState;
+use bevy_input::keyboard::KeyboardInput;
+use bevy_winit_event_converters::*;
+
 use std::{ops::Deref, sync::atomic::{AtomicBool, Ordering}};
 
 use winit::{application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop, window::{CursorGrabMode, Window, WindowId}};
@@ -68,8 +73,19 @@ impl PrimaryWindow {
 }
 
 pub struct Winit {
-    pub app: App,
-    pub window: Option<&'static Window>
+    app: App,
+    window: Option<&'static Window>,
+    bevy_window_events: Vec<KeyboardInput>
+}
+
+impl Winit {
+    pub fn new(app: App) -> Self {
+        Self {
+            app,
+            window: None,
+            bevy_window_events: vec![]
+        }
+    }
 }
 
 impl ApplicationHandler for Winit {
@@ -127,6 +143,16 @@ impl ApplicationHandler for Winit {
             WindowEvent::RedrawRequested => {
                 //self.render();
             }
+            WindowEvent::KeyboardInput {
+                ref event,
+                // On some platforms, winit sends "synthetic" key press events when the window
+                // gains or loses focus. These should not be handled, so we only process key
+                // events if they are not synthetic key presses.
+                is_synthetic: false,
+                ..
+            } => {
+                self.bevy_window_events.push(convert_keyboard_input(event));
+            }
             _ => (),
         }
     }
@@ -134,6 +160,26 @@ impl ApplicationHandler for Winit {
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         if let Some(window) = self.window.as_ref() {
             window.request_redraw();
+        }
+        self.run_app_update();
+    }
+}
+
+impl Winit {
+    fn run_app_update(&mut self) {
+        self.forward_bevy_events();
+
+        if self.app.plugins_state() == PluginsState::Cleaned {
+            self.app.update();
+        }
+    }
+    
+    fn forward_bevy_events(&mut self) {
+        let buffered_events = self.bevy_window_events.drain(..).collect::<Vec<_>>();
+        let world = self.app.world_mut();
+
+        for winit_event in buffered_events.into_iter() {
+            world.send_event(winit_event).expect("Failed to execute keyboard event");
         }
     }
 }

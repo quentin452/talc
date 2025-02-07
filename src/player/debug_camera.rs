@@ -1,5 +1,5 @@
 use crate::{bevy::prelude::*, winit::PrimaryWindow};
-use bevy_input::mouse::MouseMotion;
+use bevy_input::{keyboard::KeyboardInput, mouse::MouseMotion, ButtonState};
 
 pub mod prelude {
     pub use crate::*;
@@ -132,7 +132,23 @@ fn cursor_grab(
     window: Res<PrimaryWindow>,
 ) {
     if keys.just_pressed(key_bindings.toggle_grab_cursor) {
+        println!("grab");
         window.toggle_grab_cursor();
+    }
+}
+
+pub fn q(
+    mut keyboard_input_events: EventReader<KeyboardInput>,
+) {
+    for event in keyboard_input_events.read() {
+        println!("here: {:?}", event);
+        let KeyboardInput {
+            key_code, state, ..
+        } = event;
+        match state {
+            ButtonState::Pressed => {},
+            ButtonState::Released => {},
+        }
     }
 }
 
@@ -157,6 +173,7 @@ impl Plugin for NoCameraPlayerPlugin {
             .add_systems(Startup, initial_grab_on_flycam_spawn)
             .add_systems(Update, player_move)
             .add_systems(Update, player_look)
-            .add_systems(Update, cursor_grab);
+            .add_systems(Update, cursor_grab)
+            .add_systems(Update, q);
     }
 }

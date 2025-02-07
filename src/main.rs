@@ -13,9 +13,11 @@ pub mod utils;
 pub mod winit;
 
 use std::f32::consts::PI;
+use std::time::Duration;
 
-use bevy_app::{ScheduleRunnerPlugin, TaskPoolThreadAssignmentPolicy};
+use bevy_app::{ScheduleRunnerPlugin, TaskPoolThreadAssignmentPolicy, TerminalCtrlCHandlerPlugin};
 use bevy_input::InputPlugin;
+use bevy_log::LogPlugin;
 use bevy_time::TimePlugin;
 use bevy_utils::default;
 use render::RenderPlugin;
@@ -36,10 +38,7 @@ fn main() {
     let app = App::new();
     let event_loop = EventLoop::new().expect("Failed to create winit event loop.");
     event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.run_app(&mut Winit {
-        app,
-        window: None
-    }).expect("Could not start winit event loop.");
+    event_loop.run_app(&mut Winit::new(app)).expect("Could not start winit event loop.");
 }
 
 pub fn add_plugins(app: &mut App) {
@@ -64,7 +63,15 @@ pub fn add_plugins(app: &mut App) {
     app.add_systems(Startup, setup);
     app.add_plugins(ModLoaderPlugin);
     app.add_plugins(NoCameraPlayerPlugin);
-    app.add_plugins(ScheduleRunnerPlugin::default());
+    app.add_plugins(TransformPlugin);
+    app.add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1./64.)));
+    app.add_plugins(TerminalCtrlCHandlerPlugin);
+    app.add_event::<bevy_input::keyboard::KeyboardInput>();
+    app.add_plugins(LogPlugin {
+        level: bevy_log::Level::DEBUG,
+        filter: "".to_string(),
+        custom_layer: |_| None,
+    });
     app.add_systems(Update, smooth_transform);
     app.run();
 }

@@ -21,7 +21,7 @@ use bevy::{
         Render, RenderApp, RenderSet,
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{
-            MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, RenderMeshBufferInfo,
+            MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh,
             allocator::MeshAllocator,
         },
         render_asset::RenderAssets,
@@ -36,7 +36,7 @@ use bevy::{
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::position::{ChunkPosition, RelativePosition};
+use crate::position::{ChunkPosition, Position};
 
 /// This example uses a shader source file from the assets subdirectory
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
@@ -97,15 +97,15 @@ impl PackedQuad {
     #[inline]
     #[must_use]
     pub fn new(
-        position: RelativePosition,
+        position: Position,
         normal: u32,
         ao: u32,
         x_strech: u32,
         y_strech: u32,
     ) -> PackedQuad {
-        let x = position.x();
-        let y = position.y();
-        let z = position.z();
+        let x = position.x;
+        let y = position.y;
+        let z = position.z;
 
         let ao = 0; // todo
         let x_strech = x_strech.min(31);
@@ -113,9 +113,9 @@ impl PackedQuad {
 
         #[rustfmt::skip]
         {
-            debug_assert!(0 <= position.x() && position.x() < 32, "x position out of range. expected 0..=31, got {x}");
-            debug_assert!(0 <= position.y() && position.y() < 32, "y position out of range. expected 0..=31, got {y}");
-            debug_assert!(0 <= position.z() && position.z() < 32, "z position out of range. expected 0..=31, got {z}");
+            debug_assert!(0 <= position.x && position.x < 32, "x position out of range. expected 0..=31, got {x}");
+            debug_assert!(0 <= position.y && position.y < 32, "y position out of range. expected 0..=31, got {y}");
+            debug_assert!(0 <= position.z && position.z < 32, "z position out of range. expected 0..=31, got {z}");
             debug_assert!(normal < 6, "normal out of range. expected 0..=6, got {normal}");
             debug_assert!(ao < 4, "ao out of range. expected 0..=3, got {ao}");
             debug_assert!(x_strech < 32, "x strech out of range. expected 0..=31, got {x_strech}");

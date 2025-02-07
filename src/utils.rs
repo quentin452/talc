@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     chunky::chunk::CHUNK_SIZE_I32,
-    position::{ChunkPosition, RelativePosition},
+    position::{ChunkPosition, Position},
 };
 
 #[inline]
@@ -26,21 +26,21 @@ pub const fn index_to_ivec3_bounds_reverse(i: i32, bounds: i32) -> IVec3 {
 /// if lying on the edge of a chunk, return the edging chunk's offset.
 #[inline]
 #[must_use]
-pub fn get_edging_chunk(pos: RelativePosition) -> Option<ChunkPosition> {
+pub fn get_edging_chunk(pos: Position) -> Option<ChunkPosition> {
     let mut chunk_dir = IVec3::ZERO;
-    if pos.x() == 0 {
+    if pos.x == 0 {
         chunk_dir.x = -1;
-    } else if pos.x() == CHUNK_SIZE_I32 - 1 {
+    } else if pos.x == CHUNK_SIZE_I32 - 1 {
         chunk_dir.x = 1;
     }
-    if pos.y() == 0 {
+    if pos.y == 0 {
         chunk_dir.y = -1;
-    } else if pos.y() == CHUNK_SIZE_I32 - 1 {
+    } else if pos.y == CHUNK_SIZE_I32 - 1 {
         chunk_dir.y = 1;
     }
-    if pos.z() == 0 {
+    if pos.z == 0 {
         chunk_dir.z = -1;
-    } else if pos.z() == CHUNK_SIZE_I32 - 1 {
+    } else if pos.z == CHUNK_SIZE_I32 - 1 {
         chunk_dir.z = 1;
     }
     if chunk_dir == IVec3::ZERO {

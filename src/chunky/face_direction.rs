@@ -1,4 +1,4 @@
-use crate::position::RelativePosition;
+use crate::position::Position;
 
 use super::lod::Lod;
 use bevy::math::{IVec3, ivec3};
@@ -43,8 +43,8 @@ impl FaceDir {
 
     /// offset input position with this face direction
     #[must_use]
-    pub const fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> RelativePosition {
-        RelativePosition(match self {
+    pub const fn world_to_sample(self, axis: i32, x: i32, y: i32, _lod: Lod) -> Position {
+        Position(match self {
             Self::Up => ivec3(x, axis, y),
             Self::Down => ivec3(x, axis, y),
             Self::Left => ivec3(axis, y, x),

@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
     mod_manager::prototypes::BlockPrototype,
-    position::{ChunkPosition, RelativePosition},
+    position::{ChunkPosition, Position},
     utils::index_to_ivec3_bounds,
 };
 
@@ -68,10 +68,10 @@ impl ChunkRefs {
     /// input position is local pos to middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block(&self, pos: RelativePosition) -> &'static BlockPrototype {
-        let x = (pos.x() + CHUNK_SIZE_I32) as usize;
-        let y = (pos.y() + CHUNK_SIZE_I32) as usize;
-        let z = (pos.z() + CHUNK_SIZE_I32) as usize;
+    pub fn get_block(&self, pos: Position) -> &'static BlockPrototype {
+        let x = (pos.x + CHUNK_SIZE_I32) as usize;
+        let y = (pos.y + CHUNK_SIZE_I32) as usize;
+        let z = (pos.z + CHUNK_SIZE_I32) as usize;
         let (x_chunk, x) = ((x / CHUNK_SIZE) as i32, (x % CHUNK_SIZE));
         let (y_chunk, y) = ((y / CHUNK_SIZE) as i32, (y % CHUNK_SIZE));
         let (z_chunk, z) = ((z / CHUNK_SIZE) as i32, (z % CHUNK_SIZE));
@@ -87,7 +87,7 @@ impl ChunkRefs {
     /// panics if the local pos is outside the middle chunk
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_block_no_neighbour(&self, pos: RelativePosition) -> &'static BlockPrototype {
+    pub fn get_block_no_neighbour(&self, pos: Position) -> &'static BlockPrototype {
         let chunk_data: &Arc<ChunkData> = &self.adjacent_chunks[13];
         chunk_data.get_block(pos.into())
     }
@@ -96,7 +96,7 @@ impl ChunkRefs {
     #[must_use]
     pub fn get_adjacent_blocks(
         &self,
-        pos: RelativePosition,
+        pos: Position,
         // current back, left, down
     ) -> (
         &'static BlockPrototype,
@@ -105,9 +105,9 @@ impl ChunkRefs {
         &'static BlockPrototype,
     ) {
         let current = self.get_block(pos);
-        let back = self.get_block(pos + RelativePosition::new(0, 0, -1));
-        let left = self.get_block(pos + RelativePosition::new(-1, 0, 0));
-        let down = self.get_block(pos + RelativePosition::new(0, -1, 0));
+        let back = self.get_block(pos + Position::new(0, 0, -1));
+        let left = self.get_block(pos + Position::new(-1, 0, 0));
+        let down = self.get_block(pos + Position::new(0, -1, 0));
         (current, back, left, down)
     }
 
@@ -115,32 +115,32 @@ impl ChunkRefs {
     #[must_use]
     pub fn get_von_neumann(
         &self,
-        pos: RelativePosition,
+        pos: Position,
     ) -> [(Direction, &'static BlockPrototype); 6] {
         [
             (
                 Direction::Back,
-                self.get_block(pos + RelativePosition::new(0, 0, -1)),
+                self.get_block(pos + Position::new(0, 0, -1)),
             ),
             (
                 Direction::Forward,
-                self.get_block(pos + RelativePosition::new(0, 0, 1)),
+                self.get_block(pos + Position::new(0, 0, 1)),
             ),
             (
                 Direction::Down,
-                self.get_block(pos + RelativePosition::new(0, -1, 0)),
+                self.get_block(pos + Position::new(0, -1, 0)),
             ),
             (
                 Direction::Up,
-                self.get_block(pos + RelativePosition::new(0, 1, 0)),
+                self.get_block(pos + Position::new(0, 1, 0)),
             ),
             (
                 Direction::Left,
-                self.get_block(pos + RelativePosition::new(-1, 0, 0)),
+                self.get_block(pos + Position::new(-1, 0, 0)),
             ),
             (
                 Direction::Right,
-                self.get_block(pos + RelativePosition::new(1, 0, 0)),
+                self.get_block(pos + Position::new(1, 0, 0)),
             ),
         ]
     }
@@ -156,8 +156,8 @@ impl ChunkRefs {
     #[must_use]
     pub fn get_2(
         &self,
-        pos: RelativePosition,
-        offset: RelativePosition,
+        pos: Position,
+        offset: Position,
     ) -> (&'static BlockPrototype, &'static BlockPrototype) {
         let first = self.get_block(pos);
         let second = self.get_block(pos + offset);

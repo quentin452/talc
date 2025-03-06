@@ -7,13 +7,17 @@ use bevy::{
     tasks::{AsyncComputeTaskPool, Task, block_on},
 };
 
-use crate::{chunky::{
-    chunk::{
-        ChunkData, CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32, CHUNK_SIZE_I32
-    },
-    lod::Lod,
-}, render::chunk_material::RenderableChunk};
 use crate::position::{ChunkPosition, FloatingPosition};
+use crate::{
+    chunky::{
+        chunk::{
+            CHUNK_FLOAT_UP_BLOCKS_PER_SECOND, CHUNK_INITIAL_Y_OFFSET, CHUNK_SIZE_F32,
+            CHUNK_SIZE_I32, ChunkData,
+        },
+        lod::Lod,
+    },
+    render::chunk_material::RenderableChunk,
+};
 use crate::{mod_manager::prototypes::BlockPrototypes, render::chunk_material::ChunkMaterial};
 use crate::{player::render_distance::Scanner, smooth_transform::SmoothTransformTo};
 use futures_lite::future;

@@ -113,10 +113,7 @@ impl ChunkRefs {
 
     /// helper function to sample adjacent voxels, von neuman include all facing planes
     #[must_use]
-    pub fn get_von_neumann(
-        &self,
-        pos: Position,
-    ) -> [(Direction, &'static BlockPrototype); 6] {
+    pub fn get_von_neumann(&self, pos: Position) -> [(Direction, &'static BlockPrototype); 6] {
         [
             (
                 Direction::Back,
@@ -130,10 +127,7 @@ impl ChunkRefs {
                 Direction::Down,
                 self.get_block(pos + Position::new(0, -1, 0)),
             ),
-            (
-                Direction::Up,
-                self.get_block(pos + Position::new(0, 1, 0)),
-            ),
+            (Direction::Up, self.get_block(pos + Position::new(0, 1, 0))),
             (
                 Direction::Left,
                 self.get_block(pos + Position::new(-1, 0, 0)),

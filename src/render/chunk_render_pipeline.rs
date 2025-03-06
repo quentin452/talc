@@ -1,8 +1,36 @@
 use bevy::{
-    core_pipeline::core_3d::{Transparent3d, CORE_3D_DEPTH_FORMAT}, ecs::system::{lifetimeless::{Read, SRes}, SystemParamItem}, pbr::{MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup}, prelude::*, render::{mesh::{allocator::MeshAllocator, MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh}, render_asset::RenderAssets, render_phase::{DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases}, render_resource::{BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode, PrimitiveState, RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureFormat, VertexFormat, VertexState}, renderer::RenderDevice, view::{ExtractedView, RenderVisibleEntities, ViewTarget}}
+    core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Transparent3d},
+    ecs::system::{
+        SystemParamItem,
+        lifetimeless::{Read, SRes},
+    },
+    pbr::{
+        MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, RenderMeshInstances,
+        SetMeshBindGroup, SetMeshViewBindGroup,
+    },
+    prelude::*,
+    render::{
+        mesh::{
+            MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, allocator::MeshAllocator,
+        },
+        render_asset::RenderAssets,
+        render_phase::{
+            DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult,
+            SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
+        },
+        render_resource::{
+            BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
+            Face, FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode,
+            PrimitiveState, RenderPipelineDescriptor, SpecializedMeshPipeline,
+            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureFormat, VertexFormat,
+            VertexState,
+        },
+        renderer::RenderDevice,
+        view::{ExtractedView, RenderVisibleEntities, ViewTarget},
+    },
 };
 
-use super::chunk_material::{bind_group_layout, BakedChunkMesh};
+use super::chunk_material::{BakedChunkMesh, bind_group_layout};
 
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
@@ -35,8 +63,7 @@ pub(super) fn queue_custom_mesh_pipeline(
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
-        for &(render_entity, visible_entity) in
-            view_visible_entities.get::<BakedChunkMesh>().iter()
+        for &(render_entity, visible_entity) in view_visible_entities.get::<BakedChunkMesh>().iter()
         {
             // Get the mesh instance
             let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(visible_entity)
@@ -219,6 +246,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
         };
 
         baked_chunk_mesh.render(pass);
+        panic!("aa");
         RenderCommandResult::Success
     }
 }

@@ -90,7 +90,7 @@ fn calculate_ao(
                     let voxel_pos = match axis {
                         0 | 1 => Position::new(x as i32, y as i32, z as i32), // down,up
                         2 | 3 => Position::new(y as i32, z as i32, x as i32), // left, right
-                        _ => Position::new(x as i32, z as i32, y as i32), // forward, back
+                        _ => Position::new(x as i32, z as i32, y as i32),     // forward, back
                     };
 
                     // calculate ambient occlusion

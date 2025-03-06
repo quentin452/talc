@@ -13,8 +13,12 @@ use bevy::{
     core_pipeline::core_3d::Transparent3d,
     prelude::*,
     render::{
-        extract_component::{ExtractComponent, ExtractComponentPlugin}, render_phase::{
-            AddRenderCommand, TrackedRenderPass}, render_resource::*, renderer::RenderDevice, view::{self, VisibilityClass}, Render, RenderApp, RenderSet
+        Render, RenderApp, RenderSet,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        render_phase::{AddRenderCommand, TrackedRenderPass},
+        render_resource::*,
+        renderer::RenderDevice,
+        view::{self, VisibilityClass},
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -143,19 +147,9 @@ impl BakedChunkMesh {
             0,
             IndexFormat::Uint32,
         );
-        render_pass.set_vertex_buffer(
-            0,
-            self.simple_quad_index_buffer.vertex_buffer.slice(..),
-        );
-        render_pass.set_vertex_buffer(
-            1,
-            self.instance_buffer.slice(..)
-        );
-        render_pass.set_bind_group(
-            1,
-            &self.uniform_bind_group,
-            &[]
-        );
+        render_pass.set_vertex_buffer(0, self.simple_quad_index_buffer.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+        render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
         render_pass.draw_indexed(
             0..self.simple_quad_index_buffer.length,
             0,
@@ -192,9 +186,9 @@ impl ChunkMaterial {
                     offset: 0,
                     size: None,
                 }),
-            }]
+            }],
         );
-        
+
         BakedChunkMesh {
             instance_buffer,
             uniform_bind_group,
@@ -216,7 +210,7 @@ pub fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
                 min_binding_size: None,
             },
             count: None,
-        }]
+        }],
     )
 }
 
@@ -227,7 +221,7 @@ struct SimpleQuad {
     length: u32,
 }
 
-impl SimpleQuad  {
+impl SimpleQuad {
     fn new(render_device: &RenderDevice) -> Self {
         const SQUARE_VERTICES: &[[f32; 3]] = &[
             [0.0, 0.0, 0.0],

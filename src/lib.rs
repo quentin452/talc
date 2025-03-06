@@ -1,4 +1,5 @@
 #![feature(stmt_expr_attributes)]
+#![feature(lock_value_accessors)]
 
 pub mod chunky;
 pub mod mod_manager;

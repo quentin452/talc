@@ -7,6 +7,7 @@ use bevy::{
     tasks::{AsyncComputeTaskPool, Task, block_on},
 };
 
+use crate::mod_manager::prototypes::BlockPrototypes;
 use crate::position::{ChunkPosition, FloatingPosition};
 use crate::{
     chunky::{
@@ -18,7 +19,6 @@ use crate::{
     },
     render::chunk_material::RenderableChunk,
 };
-use crate::{mod_manager::prototypes::BlockPrototypes, render::chunk_material::ChunkMaterial};
 use crate::{player::render_distance::Scanner, smooth_transform::SmoothTransformTo};
 use futures_lite::future;
 
@@ -56,7 +56,7 @@ pub struct AsyncChunkloader {
     pub load_mesh_queue: Vec<ChunkRefs>,
     pub unload_mesh_queue: Vec<ChunkPosition>,
     pub worldgen_tasks: HashMap<ChunkPosition, Task<ChunkData>>,
-    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<ChunkMaterial>>>,
+    pub mesh_tasks: HashMap<ChunkPosition, Task<Option<RenderableChunk>>>,
 }
 
 impl AsyncChunkloader {
@@ -215,17 +215,16 @@ fn join_mesh_threads(
         let status = block_on(future::poll_once(task));
 
         // keep the entry in our task vector only if the task is not done yet
-        let Some(instance_data_optional) = status else {
+        let Some(renderable_chunk_optional) = status else {
             return true;
         };
 
         // if this task is done, handle the data it returned!
-        if let Some(instance_data) = instance_data_optional {
+        if let Some(renderable_chunk) = renderable_chunk_optional {
             // todo: refactor to use bevy indexes when the update drops.
             for (entity_id, chunk) in chunk_canididates.iter() {
                 if chunk.position == *chunk_position {
                     if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
-                        let renderable_chunk = RenderableChunk(Arc::new(instance_data));
                         entity_commands.insert(renderable_chunk);
                         break;
                     }

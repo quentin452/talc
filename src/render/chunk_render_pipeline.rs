@@ -4,45 +4,73 @@ use bevy::{
         SystemParamItem,
         lifetimeless::{Read, SRes},
     },
-    pbr::{
-        MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, RenderMeshInstances,
-        SetMeshBindGroup, SetMeshViewBindGroup,
-    },
+    pbr::{MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, SetMeshViewBindGroup},
     prelude::*,
     render::{
-        mesh::{
-            MeshVertexAttribute, MeshVertexBufferLayoutRef, RenderMesh, allocator::MeshAllocator,
-        },
-        render_asset::RenderAssets,
+        Render, RenderApp, RenderSet,
+        extract_component::ExtractComponentPlugin,
+        mesh::{PrimitiveTopology, VertexBufferLayout},
         render_phase::{
-            DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult,
-            SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
+            AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
+            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
         },
         render_resource::{
             BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
             Face, FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode,
-            PrimitiveState, RenderPipelineDescriptor, SpecializedMeshPipeline,
-            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureFormat, VertexFormat,
-            VertexState,
+            PrimitiveState, RenderPipelineDescriptor, SpecializedRenderPipeline,
+            SpecializedRenderPipelines, TextureFormat, VertexAttribute, VertexFormat, VertexState,
+            VertexStepMode,
         },
         renderer::RenderDevice,
         view::{ExtractedView, RenderVisibleEntities, ViewTarget},
     },
 };
 
-use super::chunk_material::{BakedChunkMesh, bind_group_layout};
+use super::chunk_material::{RenderableChunk, bind_group_layout};
 
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
+// When writing custom rendering code it's generally recommended to use a plugin.
+// The main reason for this is that it gives you access to the finish() hook
+// which is called after rendering resources are initialized.
+pub struct ChunkRenderPipelinePlugin;
+impl Plugin for ChunkRenderPipelinePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(ExtractComponentPlugin::<RenderableChunk>::extract_visible());
+
+        // We make sure to add these to the render app, not the main app.
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app.add_render_command::<Transparent3d, DrawCustom>();
+        render_app.init_resource::<SpecializedRenderPipelines<CustomPipeline>>();
+        render_app.add_systems(
+            Render,
+            (
+                queue_custom_render_pipeline.in_set(RenderSet::QueueMeshes),
+                //prepare_instance_buffers.in_set(RenderSet::PrepareResources),
+            ),
+        );
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+        // Creating this pipeline needs the RenderDevice and RenderQueue
+        // which are only available once rendering plugins are initialized.
+        render_app.init_resource::<CustomPipeline>();
+    }
+}
+
 /// A render-world system that enqueues the entity with custom rendering into
 /// the opaque render phases of each view.
-pub(super) fn queue_custom_mesh_pipeline(
+fn queue_custom_render_pipeline(
     transparent_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
     custom_pipeline: Res<CustomPipeline>,
-    mut pipelines: ResMut<SpecializedMeshPipelines<CustomPipeline>>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<CustomPipeline>>,
     pipeline_cache: Res<PipelineCache>,
-    meshes: Res<RenderAssets<RenderMesh>>,
-    render_mesh_instances: Res<RenderMeshInstances>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     views: Query<(&RenderVisibleEntities, &ExtractedView, &Msaa)>,
 ) {
@@ -62,43 +90,30 @@ pub(super) fn queue_custom_mesh_pipeline(
         let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
-        let rangefinder = view.rangefinder3d();
-        for &(render_entity, visible_entity) in view_visible_entities.get::<BakedChunkMesh>().iter()
+        //let rangefinder = view.rangefinder3d();
+        for &(render_entity, visible_entity) in
+            view_visible_entities.get::<RenderableChunk>().iter()
         {
-            // Get the mesh instance
-            let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(visible_entity)
-            else {
-                continue;
-            };
-
-            // Get the mesh data
-            let Some(mesh) = meshes.get(mesh_instance.mesh_asset_id) else {
-                continue;
-            };
-
             // Specialize the key for the current mesh entity
             // For this example we only specialize based on the mesh topology
             // but you could have more complex keys and that's where you'd need to create those keys
-            let key =
-                view_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology());
+            let key = view_key
+                | MeshPipelineKey::from_primitive_topology(PrimitiveTopology::TriangleList);
 
             // Finally, we can specialize the pipeline based on the key
-            let pipeline = pipelines
-                .specialize(&pipeline_cache, &custom_pipeline, key, &mesh.layout)
-                // This should never with this example, but if your pipeline specialization
-                // can fail you need to handle the error here
-                .expect("Failed to specialize mesh pipeline");
+            let pipeline = pipelines.specialize(&pipeline_cache, &custom_pipeline, key);
 
             // Add the mesh with our specialized pipeline
             transparent_phase.add(Transparent3d {
                 entity: (render_entity, visible_entity),
                 pipeline,
                 draw_function: draw_custom,
-                distance: rangefinder.distance_translation(&mesh_instance.translation),
+                distance: 0.0,
                 batch_range: 0..1,
                 extra_index: PhaseItemExtraIndex::None,
                 indexed: true,
             });
+            panic!("q");
         }
     }
 }
@@ -131,40 +146,32 @@ pub(super) type DrawCustom = (
     SetItemPipeline,
     // Set the view uniform at bind group 0
     SetMeshViewBindGroup<0>,
-    // Set the mesh uniform at bind group 1
-    SetMeshBindGroup<1>,
-    // Draw the mesh
-    DrawMeshInstanced,
+    DrawChunk,
 );
 
-// A "high" random id should be used for custom attributes to ensure consistent sorting and avoid collisions with other attributes.
-// See the MeshVertexAttribute docs for more info.
-pub const ATTRIBUTE_VOXEL: MeshVertexAttribute =
-    MeshVertexAttribute::new("Voxel", 988540919, VertexFormat::Uint32);
-
 // Set a custom vertex buffer layout for our render pipeline.
-impl SpecializedMeshPipeline for CustomPipeline {
+impl SpecializedRenderPipeline for CustomPipeline {
     type Key = MeshPipelineKey;
 
-    fn specialize(
-        &self,
-        mesh_key: Self::Key,
-        layout: &MeshVertexBufferLayoutRef,
-    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
+    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
         // Define a buffer layout for our vertex buffer. Our vertex buffer only has one entry which is a packed u32
-        let vertex_buffer_layout = layout
-            .0
-            .get_layout(&[ATTRIBUTE_VOXEL.at_shader_location(0)])?;
+        let vertex_buffer_layout = VertexBufferLayout {
+            array_stride: 0,
+            step_mode: VertexStepMode::Vertex,
+            attributes: vec![VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 0,
+                shader_location: 0,
+            }],
+        };
 
-        Ok(RenderPipelineDescriptor {
+        RenderPipelineDescriptor {
             label: Some("Specialized Mesh Pipeline".into()),
             layout: vec![
                 // Bind group 0 is the view uniform
                 self.mesh_pipeline
-                    .get_view_layout(MeshPipelineViewLayoutKey::from(mesh_key))
+                    .get_view_layout(MeshPipelineViewLayoutKey::from(key))
                     .clone(),
-                // Bind group 1 is the mesh uniform
-                self.mesh_pipeline.mesh_layouts.model_only.clone(),
                 // Bind group 2 is our custom chunk uniform.
                 self.bind_group_layout.clone(),
             ],
@@ -183,7 +190,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                 targets: vec![Some(ColorTargetState {
                     // This isn't required, but bevy supports HDR and non-HDR rendering
                     // so it's generally recommended to specialize the pipeline for that
-                    format: if mesh_key.contains(MeshPipelineKey::HDR) {
+                    format: if key.contains(MeshPipelineKey::HDR) {
                         ViewTarget::TEXTURE_FORMAT_HDR
                     } else {
                         TextureFormat::bevy_default()
@@ -195,7 +202,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                 })],
             }),
             primitive: PrimitiveState {
-                topology: mesh_key.primitive_topology(),
+                topology: key.primitive_topology(),
                 front_face: FrontFace::Ccw,
                 cull_mode: Some(Face::Back),
                 polygon_mode: PolygonMode::Fill,
@@ -214,39 +221,34 @@ impl SpecializedMeshPipeline for CustomPipeline {
             // It's generally recommended to specialize your pipeline for MSAA,
             // but it's not always possible
             multisample: MultisampleState {
-                count: mesh_key.msaa_samples(),
+                count: key.msaa_samples(),
                 ..MultisampleState::default()
             },
             zero_initialize_workgroup_memory: false,
-        })
+        }
     }
 }
 
-pub(super) struct DrawMeshInstanced;
+pub(super) struct DrawChunk;
 
-impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
-    type Param = (
-        SRes<RenderAssets<RenderMesh>>,
-        SRes<RenderMeshInstances>,
-        SRes<MeshAllocator>,
-    );
+impl<P: PhaseItem> RenderCommand<P> for DrawChunk {
+    type Param = (SRes<RenderDevice>,);
     type ViewQuery = ();
-    type ItemQuery = Read<BakedChunkMesh>;
+    type ItemQuery = Read<RenderableChunk>;
 
     #[inline]
     fn render<'w>(
         _item: &P,
         _view: (),
-        baked_chunk_mesh: Option<&'w BakedChunkMesh>,
-        _: SystemParamItem<'w, '_, Self::Param>,
+        renderable_chunk: Option<&'w RenderableChunk>,
+        (ref render_device,): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let Some(baked_chunk_mesh) = baked_chunk_mesh else {
+        let Some(renderable_chunk) = renderable_chunk else {
             return RenderCommandResult::Skip;
         };
 
-        baked_chunk_mesh.render(pass);
-        panic!("aa");
+        renderable_chunk.render(render_device, pass);
         RenderCommandResult::Success
     }
 }

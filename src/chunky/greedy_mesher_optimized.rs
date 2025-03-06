@@ -3,7 +3,7 @@ use bevy::{platform_support::collections::HashMap, prelude::*};
 use crate::{
     mod_manager::prototypes::BlockPrototype,
     position::Position,
-    render::chunk_material::{ChunkMaterial, PackedQuad},
+    render::chunk_material::{PackedQuad, RenderableChunk},
 };
 
 use super::{
@@ -131,7 +131,7 @@ fn calculate_ao(
 }
 
 #[must_use]
-pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<ChunkMaterial> {
+pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<RenderableChunk> {
     // early exit, if all faces are culled
     if chunks_refs.is_all_voxels_same() {
         return None;
@@ -237,10 +237,10 @@ pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Ch
         return None;
     }
 
-    Some(ChunkMaterial {
+    Some(RenderableChunk::new(
         quads,
-        chunk_position: chunks_refs.center_chunk_position,
-    })
+        chunks_refs.center_chunk_position,
+    ))
 }
 
 #[derive(Debug)]

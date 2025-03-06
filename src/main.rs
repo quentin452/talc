@@ -17,7 +17,7 @@ use talc::player::{
     render_distance::Scanner,
     render_distance::ScannerPlugin,
 };
-use talc::render::chunk_material::CustomChunkMaterialPlugin;
+use talc::render::chunk_render_pipeline::ChunkRenderPipelinePlugin;
 use talc::smooth_transform::smooth_transform;
 use talc::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
 
@@ -51,7 +51,7 @@ fn main() {
         .add_plugins(ModLoaderPlugin)
         .add_plugins(NoCameraPlayerPlugin)
         .add_systems(Update, smooth_transform)
-        .add_plugins(CustomChunkMaterialPlugin)
+        .add_plugins(ChunkRenderPipelinePlugin)
         .run();
 }
 

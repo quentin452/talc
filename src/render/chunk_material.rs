@@ -7,15 +7,13 @@
 //! implementation using bevy's low level rendering api.
 //! It's generally recommended to try the built-in instancing before going with this approach.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use bevy::{
-    core_pipeline::core_3d::Transparent3d,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
-        extract_component::{ExtractComponent, ExtractComponentPlugin},
-        render_phase::{AddRenderCommand, TrackedRenderPass},
+        extract_component::ExtractComponent,
+        render_phase::TrackedRenderPass,
         render_resource::*,
         renderer::RenderDevice,
         view::{self, VisibilityClass},
@@ -24,42 +22,6 @@ use bevy::{
 use bytemuck::{Pod, Zeroable};
 
 use crate::position::{ChunkPosition, Position};
-
-use super::chunk_render_pipeline::*;
-
-// When writing custom rendering code it's generally recommended to use a plugin.
-// The main reason for this is that it gives you access to the finish() hook
-// which is called after rendering resources are initialized.
-pub struct CustomChunkMaterialPlugin;
-impl Plugin for CustomChunkMaterialPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractComponentPlugin::<RenderableChunk>::default());
-
-        // We make sure to add these to the render app, not the main app.
-        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-
-        render_app.add_render_command::<Transparent3d, DrawCustom>();
-        render_app.init_resource::<SpecializedMeshPipelines<CustomPipeline>>();
-        render_app.add_systems(
-            Render,
-            (
-                queue_custom_mesh_pipeline.in_set(RenderSet::QueueMeshes),
-                //prepare_instance_buffers.in_set(RenderSet::PrepareResources),
-            ),
-        );
-    }
-
-    fn finish(&self, app: &mut App) {
-        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-        // Creating this pipeline needs the RenderDevice and RenderQueue
-        // which are only available once rendering plugins are initialized.
-        render_app.init_resource::<CustomPipeline>();
-    }
-}
 
 /// In talc we draw quads instead of triangles.
 /// This struct repersents bit packed data for each quad ready to be sent to the GPU.
@@ -124,81 +86,105 @@ impl PackedQuad {
 /// tell Bevy that this object should be pulled into the render world. Also note
 /// the `on_add` hook, which is needed to tell Bevy's `check_visibility` system
 /// that entities with this component need to be examined for visibility.
-#[derive(Clone, Component, ExtractComponent, Deref)]
+#[derive(Clone, Component, ExtractComponent)]
 #[require(VisibilityClass)]
 #[component(on_add = view::add_visibility_class::<RenderableChunk>)]
-pub struct RenderableChunk(pub Arc<ChunkMaterial>);
+pub struct RenderableChunk(Arc<ChunkMaterial>);
 
-/// Bufferized and GPU-ready version of a chunk.
-/// Each chunk in the render world ECS holds one of these.
-#[derive(Component)]
-pub struct BakedChunkMesh {
+impl RenderableChunk {
+    pub fn new(quads: Vec<PackedQuad>, chunk_position: ChunkPosition) -> Self {
+        RenderableChunk(Arc::new(ChunkMaterial {
+            quads,
+            chunk_position,
+            baked: OnceLock::new(),
+        }))
+    }
+
+    #[inline]
+    pub fn render<'w>(
+        &'w self,
+        render_device: &RenderDevice,
+        render_pass: &mut TrackedRenderPass<'w>,
+    ) {
+        self.0.render(render_device, render_pass)
+    }
+}
+
+struct BakedChunkMaterial {
     instance_buffer: Buffer,
     instance_buffer_length: usize,
     uniform_bind_group: BindGroup,
     simple_quad_index_buffer: SimpleQuad,
 }
 
-impl BakedChunkMesh {
-    #[inline]
-    pub fn render<'w>(&'w self, render_pass: &mut TrackedRenderPass<'w>) {
-        render_pass.set_index_buffer(
-            self.simple_quad_index_buffer.index_buffer.slice(..),
-            0,
-            IndexFormat::Uint32,
-        );
-        render_pass.set_vertex_buffer(0, self.simple_quad_index_buffer.vertex_buffer.slice(..));
-        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-        render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
-        render_pass.draw_indexed(
-            0..self.simple_quad_index_buffer.length,
-            0,
-            0..self.instance_buffer_length as u32,
-        );
-    }
-}
-
-/// Is trivally converted to `BakedChunkMesh`.
-pub struct ChunkMaterial {
-    pub quads: Vec<PackedQuad>,
-    pub chunk_position: ChunkPosition,
+struct ChunkMaterial {
+    quads: Vec<PackedQuad>,
+    chunk_position: ChunkPosition,
+    baked: OnceLock<BakedChunkMaterial>,
 }
 
 impl ChunkMaterial {
-    pub fn bake(&self, render_device: &RenderDevice) -> BakedChunkMesh {
-        let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("chunk per-instance data buffer"),
-            contents: bytemuck::cast_slice(self.quads.as_slice()),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
-        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("chunk uniform buffer"),
-            contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
-            usage: BufferUsages::UNIFORM,
-        });
-        let uniform_bind_group = render_device.create_bind_group(
-            Some("chunk bind group"),
-            &bind_group_layout(render_device),
-            &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Buffer(BufferBinding {
-                    buffer: &uniform_buffer,
-                    offset: 0,
-                    size: None,
-                }),
-            }],
-        );
+    #[inline]
+    fn bake(&self, render_device: &RenderDevice) -> &BakedChunkMaterial {
+        self.baked.get_or_init(|| {
+            let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+                label: Some("chunk per-instance data buffer"),
+                contents: bytemuck::cast_slice(self.quads.as_slice()),
+                usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            });
+            let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+                label: Some("chunk uniform buffer"),
+                contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
+                usage: BufferUsages::UNIFORM,
+            });
+            let uniform_bind_group = render_device.create_bind_group(
+                Some("chunk bind group"),
+                &bind_group_layout(render_device),
+                &[BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::Buffer(BufferBinding {
+                        buffer: &uniform_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                }],
+            );
 
-        BakedChunkMesh {
+            BakedChunkMaterial {
+                instance_buffer,
+                uniform_bind_group,
+                instance_buffer_length: self.quads.len(),
+                simple_quad_index_buffer: SimpleQuad::new(render_device),
+            }
+        })
+    }
+
+    #[inline]
+    fn render<'w>(&'w self, render_device: &RenderDevice, render_pass: &mut TrackedRenderPass<'w>) {
+        let BakedChunkMaterial {
             instance_buffer,
+            instance_buffer_length,
             uniform_bind_group,
-            instance_buffer_length: self.quads.len(),
-            simple_quad_index_buffer: SimpleQuad::new(render_device),
-        }
+            simple_quad_index_buffer,
+        } = self.bake(render_device);
+
+        render_pass.set_index_buffer(
+            simple_quad_index_buffer.index_buffer.slice(..),
+            0,
+            IndexFormat::Uint32,
+        );
+        render_pass.set_vertex_buffer(0, simple_quad_index_buffer.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+        render_pass.set_bind_group(1, &uniform_bind_group, &[]);
+        render_pass.draw_indexed(
+            0..simple_quad_index_buffer.length,
+            0,
+            0..*instance_buffer_length as u32,
+        );
     }
 }
 
-pub fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
+pub(super) fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
     render_device.create_bind_group_layout(
         Some("chunk uniform buffer bind ground layout"),
         &[BindGroupLayoutEntry {

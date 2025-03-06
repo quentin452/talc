@@ -66,7 +66,7 @@ fn toggle_grab_cursor(window: &mut Window) {
 
 /// Grabs the cursor when game first starts
 fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow>>) {
-    if let Ok(mut window) = primary_window.get_single_mut() {
+    if let Ok(mut window) = primary_window.single_mut() {
         toggle_grab_cursor(&mut window);
     } else {
         warn!("Primary window not found for `initial_grab_cursor`!");
@@ -83,7 +83,7 @@ fn player_move(
     key_bindings: Res<KeyBindings>,
     mut query: Query<(&FlyCam, &mut Transform)>, //    mut query: Query<&mut Transform, With<FlyCam>>,
 ) {
-    if let Ok(window) = primary_window.get_single() {
+    if let Ok(window) = primary_window.single() {
         for (_camera, mut transform) in &mut query {
             let mut velocity = Vec3::ZERO;
             let local_z = transform.local_z();
@@ -126,7 +126,7 @@ fn player_look(
     mut state: EventReader<MouseMotion>,
     mut query: Query<&mut Transform, With<FlyCam>>,
 ) {
-    if let Ok(window) = primary_window.get_single() {
+    if let Ok(window) = primary_window.single() {
         for mut transform in &mut query {
             for ev in state.read() {
                 let (mut yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
@@ -155,7 +155,7 @@ fn cursor_grab(
     key_bindings: Res<KeyBindings>,
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    if let Ok(mut window) = primary_window.get_single_mut() {
+    if let Ok(mut window) = primary_window.single_mut() {
         if keys.just_pressed(key_bindings.toggle_grab_cursor) {
             toggle_grab_cursor(&mut window);
         }
@@ -174,7 +174,7 @@ fn initial_grab_on_flycam_spawn(
         return;
     }
 
-    if let Ok(window) = &mut primary_window.get_single_mut() {
+    if let Ok(window) = &mut primary_window.single_mut() {
         toggle_grab_cursor(window);
     } else {
         warn!("Primary window not found for `initial_grab_cursor`!");

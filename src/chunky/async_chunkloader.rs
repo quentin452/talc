@@ -144,7 +144,7 @@ fn start_worldgen_threads(
     scanners: Query<&GlobalTransform, With<Scanner>>,
 ) {
     let task_pool = AsyncComputeTaskPool::get();
-    let scanner = scanners.single();
+    let scanner = scanners.single().unwrap();
     let player_position = FloatingPosition(scanner.translation());
 
     let to_load: Vec<ChunkPosition> = chunkloader.get_chunks_to_load(player_position).collect();
@@ -184,7 +184,7 @@ fn start_mesh_threads(
     scanners: Query<&GlobalTransform, With<Scanner>>,
 ) {
     let task_pool = AsyncComputeTaskPool::get();
-    let scanner = scanners.single();
+    let scanner = scanners.single().unwrap();
     let player_position = FloatingPosition(scanner.translation());
 
     let to_mesh: Vec<ChunkRefs> = chunkloader.get_chunks_to_mesh(player_position).collect();
@@ -220,7 +220,7 @@ fn join_mesh_threads(
             // todo: refactor to use bevy indexes when the update drops.
             for (entity_id, chunk) in chunk_canididates.iter() {
                 if chunk.position == *chunk_position {
-                    if let Some(mut entity_commands) = commands.get_entity(entity_id) {
+                    if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
                         let renderable_chunk = RenderableChunk(Arc::new(instance_data));
                         entity_commands.insert(renderable_chunk);
                         break;
@@ -246,7 +246,7 @@ fn unload_chunks(
         // todo: refactor to use bevy indexes when the update drops.
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
-                if let Some(mut entity_commands) = commands.get_entity(entity_id) {
+                if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
                     entity_commands.despawn();
                     break;
                 }
@@ -269,7 +269,7 @@ fn unload_meshes(
         // todo: refactor to use bevy indexes when the update drops.
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
-                if let Some(mut entity_commands) = commands.get_entity(entity_id) {
+                if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
                     entity_commands.remove::<Mesh3d>();
                     break;
                 }

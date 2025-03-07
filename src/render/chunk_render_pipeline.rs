@@ -1,28 +1,21 @@
 use bevy::{
-    core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Transparent3d},
+    core_pipeline::core_3d::{Transparent3d, CORE_3D_DEPTH_FORMAT},
     ecs::system::{
-        SystemParamItem,
-        lifetimeless::{Read, SRes},
+        lifetimeless::{Read, SRes}, SystemParamItem
     },
     pbr::{MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, SetMeshViewBindGroup},
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
-        extract_component::ExtractComponentPlugin,
-        mesh::{PrimitiveTopology, VertexBufferLayout},
-        render_phase::{
+        extract_component::ExtractComponentPlugin, mesh::{PrimitiveTopology, VertexBufferLayout}, render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
             RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-        },
-        render_resource::{
+        }, render_resource::{
             BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
             Face, FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode,
             PrimitiveState, RenderPipelineDescriptor, SpecializedRenderPipeline,
             SpecializedRenderPipelines, TextureFormat, VertexAttribute, VertexFormat, VertexState,
             VertexStepMode,
-        },
-        renderer::RenderDevice,
-        view::{ExtractedView, RenderVisibleEntities, ViewTarget},
+        }, renderer::RenderDevice, sync_world::MainEntity, view::{ExtractedView, RenderVisibleEntities, ViewTarget}, Render, RenderApp, RenderSet
     },
 };
 
@@ -36,7 +29,7 @@ const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 pub struct ChunkRenderPipelinePlugin;
 impl Plugin for ChunkRenderPipelinePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractComponentPlugin::<RenderableChunk>::extract_visible());
+        app.add_plugins(ExtractComponentPlugin::<RenderableChunk>::default()); // TODO
 
         // We make sure to add these to the render app, not the main app.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -73,6 +66,7 @@ fn queue_custom_render_pipeline(
     pipeline_cache: Res<PipelineCache>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     views: Query<(&RenderVisibleEntities, &ExtractedView, &Msaa)>,
+    material_meshes: Query<(Entity, &MainEntity), With<RenderableChunk>>,
 ) {
     // Get the id for our custom draw function
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
@@ -80,7 +74,7 @@ fn queue_custom_render_pipeline(
     // Render phases are per-view, so we need to iterate over all views so that
     // the entity appears in them. (In this example, we have only one view, but
     // it's good practice to loop over all views anyway.)
-    for (view_visible_entities, view, msaa) in &views {
+    for (_, view, msaa) in &views {
         let Some(transparent_phase) = transparent_render_phases.get_mut(&view.retained_view_entity)
         else {
             continue;
@@ -91,8 +85,7 @@ fn queue_custom_render_pipeline(
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         //let rangefinder = view.rangefinder3d();
-        for &(render_entity, visible_entity) in
-            view_visible_entities.get::<RenderableChunk>().iter()
+        for (render_entity, visible_entity) in &material_meshes // TODO: frustrum culling. see https://github.com/bevyengine/bevy/blob/19ee692f9621f89f305096f423507e925b748b9a/examples/shader/specialized_mesh_pipeline.rs#L353
         {
             // Specialize the key for the current mesh entity
             // For this example we only specialize based on the mesh topology
@@ -105,15 +98,14 @@ fn queue_custom_render_pipeline(
 
             // Add the mesh with our specialized pipeline
             transparent_phase.add(Transparent3d {
-                entity: (render_entity, visible_entity),
+                entity: (render_entity, *visible_entity),
                 pipeline,
                 draw_function: draw_custom,
-                distance: 0.0,
+                distance: 2.0,//rangefinder.distance_translation(&mesh_instance.translation),
                 batch_range: 0..1,
                 extra_index: PhaseItemExtraIndex::None,
                 indexed: true,
             });
-            panic!("q");
         }
     }
 }

@@ -1,7 +1,19 @@
-struct Camera {
-    view_proj: mat4x4<f32>,
-};
-@group(0) @binding(0) var<uniform> camera: Camera;
+#import bevy_pbr::{
+    pbr_fragment::pbr_input_from_standard_material,
+    pbr_functions::alpha_discard,
+}
+
+#import bevy_pbr::{
+    forward_io::{FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+}
+
+#import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip, mesh_normal_local_to_world}
+#import bevy_pbr::pbr_functions::{calculate_view, prepare_world_normal}
+#import bevy_pbr::mesh_bindings
+#import bevy_pbr::mesh_bindings::mesh
+#import bevy_pbr::pbr_types::pbr_input_new
+#import bevy_pbr::view_transformations::position_world_to_clip
 
 @group(1) @binding(0)
 var<uniform> chunk_position: vec3<i32>;
@@ -43,9 +55,9 @@ fn x_positive_bits(bits: u32) -> u32 {
 
 @vertex
 fn vertex(vertex: VertexInput) -> VertexOutput {
-    let x = i32(vertex.vert_data & x_positive_bits(5u)) + (chunk_position.x * 32) + i32(vertex.constant_quad.x);
-    let y = i32(vertex.vert_data >> 5u & x_positive_bits(5u)) + (chunk_position.y * 32) + i32(vertex.constant_quad.y);
-    let z = i32(vertex.vert_data >> 10u & x_positive_bits(5u)) + (chunk_position.z * 32) + i32(vertex.constant_quad.z);
+    let x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32) + f32(vertex.constant_quad.x);
+    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32) + f32(vertex.constant_quad.y);
+    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32) + f32(vertex.constant_quad.z);
     //let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
     let ao = 0.0;
     //let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
@@ -54,9 +66,11 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
 
     var out: VertexOutput;
     out.normal = normals[normal_index];
-    out.clip_position = camera.view_proj * vec4<f32>(f32(x), f32(y), f32(z), 1.0);
-    out.position = vec3<f32>(f32(x), f32(y), f32(z));
     out.ambient = ao;
+
+    let local_position = vec4<f32>(x,y,z, 1.0);
+    let world_position = vec4<f32>(f32(chunk_position.x * 32), f32(chunk_position.y * 32), f32(chunk_position.z * 32), 1.0);
+    out.clip_position = position_world_to_clip(world_position.xyz + local_position.xyz);
 
     return out;
 }

@@ -150,11 +150,25 @@ impl SpecializedRenderPipeline for CustomPipeline {
         let vertex_buffer_layout = VertexBufferLayout {
             array_stride: 0,
             step_mode: VertexStepMode::Vertex,
-            attributes: vec![VertexAttribute {
-                format: VertexFormat::Uint32,
-                offset: 0,
-                shader_location: 0,
-            }],
+            attributes: vec![
+                VertexAttribute {
+                    format: VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 0,
+                }
+            ],
+        };
+
+        let instance_buffer_layout = VertexBufferLayout {
+            array_stride: 0,
+            step_mode: VertexStepMode::Instance,
+            attributes: vec![
+                VertexAttribute {
+                    format: VertexFormat::Uint32,
+                    offset: std::mem::size_of::<[f32; 3]>() as u64,
+                    shader_location: 1,
+                }
+            ],
         };
 
         RenderPipelineDescriptor {
@@ -164,7 +178,7 @@ impl SpecializedRenderPipeline for CustomPipeline {
                 self.mesh_pipeline
                     .get_view_layout(MeshPipelineViewLayoutKey::from(key))
                     .clone(),
-                // Bind group 2 is our custom chunk uniform.
+                // Bind group 1 is the chunk position.
                 self.bind_group_layout.clone(),
             ],
             push_constant_ranges: vec![],
@@ -173,7 +187,7 @@ impl SpecializedRenderPipeline for CustomPipeline {
                 shader_defs: vec![],
                 entry_point: "vertex".into(),
                 // Customize how to store the meshes' vertex attributes in the vertex buffer
-                buffers: vec![vertex_buffer_layout],
+                buffers: vec![instance_buffer_layout, vertex_buffer_layout],
             },
             fragment: Some(FragmentState {
                 shader: self.shader_handle.clone(),

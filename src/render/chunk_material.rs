@@ -114,7 +114,7 @@ struct BakedChunkMaterial {
     instance_buffer: Buffer,
     instance_buffer_length: usize,
     uniform_bind_group: BindGroup,
-    simple_quad_index_buffer: SimpleQuad,
+    simple_quad: SimpleQuad,
 }
 
 struct ChunkMaterial {
@@ -137,6 +137,7 @@ impl ChunkMaterial {
                 contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
                 usage: BufferUsages::UNIFORM,
             });
+            
             let uniform_bind_group = render_device.create_bind_group(
                 Some("chunk bind group"),
                 &bind_group_layout(render_device),
@@ -154,7 +155,7 @@ impl ChunkMaterial {
                 instance_buffer,
                 uniform_bind_group,
                 instance_buffer_length: self.quads.len(),
-                simple_quad_index_buffer: SimpleQuad::new(render_device),
+                simple_quad: SimpleQuad::new(render_device),
             }
         })
     }
@@ -165,7 +166,7 @@ impl ChunkMaterial {
             instance_buffer,
             instance_buffer_length,
             uniform_bind_group,
-            simple_quad_index_buffer,
+            simple_quad: simple_quad_index_buffer,
         } = self.bake(render_device);
 
         render_pass.set_index_buffer(

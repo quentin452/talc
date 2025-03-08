@@ -55,9 +55,9 @@ fn x_positive_bits(bits: u32) -> u32 {
 
 @vertex
 fn vertex(vertex: VertexInput) -> VertexOutput {
-    let x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32) + f32(vertex.constant_quad.x);
-    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32) + f32(vertex.constant_quad.y);
-    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32) + f32(vertex.constant_quad.z);
+    let x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32) + vertex.constant_quad.x;
+    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32) + vertex.constant_quad.y;
+    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32) + vertex.constant_quad.z;
     //let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
     let ao = 0.0;
     //let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
@@ -68,9 +68,7 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
     out.normal = normals[normal_index];
     out.ambient = ao;
 
-    let local_position = vec4<f32>(x,y,z, 1.0);
-    let world_position = vec4<f32>(f32(chunk_position.x * 32), f32(chunk_position.y * 32), f32(chunk_position.z * 32), 1.0);
-    out.clip_position = position_world_to_clip(world_position.xyz + local_position.xyz);
+    out.clip_position = position_world_to_clip(vec3<f32>(x,y,z));
 
     return out;
 }

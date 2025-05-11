@@ -18,23 +18,13 @@
 @group(1) @binding(0)
 var<uniform> chunk_position: vec3<i32>;
 
-struct VertexInput {
+struct InstanceInput {
     @location(0) constant_quad: vec3<f32>,
+};
+
+struct VertexInput {
     @location(1) vert_data: u32,
 };
-
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) normal: vec3<f32>,
-    @location(1) position: vec3<f32>,
-    @location(2) blend_color: vec3<f32>,
-    @location(3) ambient: f32,
-};
-
-struct Light {
-    position: vec3<f32>,
-    color: vec3<f32>,
-}
 
 var<private> ambient_lerps: vec4<f32> = vec4<f32>(1.0,0.7,0.5,0.15);
 
@@ -54,10 +44,11 @@ fn x_positive_bits(bits: u32) -> u32 {
 }
 
 @vertex
-fn vertex(vertex: VertexInput) -> VertexOutput {
-    let x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32) + vertex.constant_quad.x;
-    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32) + vertex.constant_quad.y;
-    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32) + vertex.constant_quad.z;
+fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
+    let x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32) + instance_input.constant_quad.x;
+    let y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32) + instance_input.constant_quad.y;
+    let z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32) + instance_input.constant_quad.z;
+    
     //let ao = vertex.vert_data >> 18u & x_positive_bits(3u);
     let ao = 0.0;
     //let normal_index = vertex.vert_data >> 21u & x_positive_bits(3u);
@@ -73,10 +64,23 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
     return out;
 }
 
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) normal: vec3<f32>,
+    @location(1) position: vec3<f32>,
+    @location(2) blend_color: vec3<f32>,
+    @location(3) ambient: f32,
+};
+
+struct Light {
+    position: vec3<f32>,
+    color: vec3<f32>,
+}
+
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-
+    let object_color: vec4<f32> = vec4<f32>(1.0, 0.0, 1.0, 1.0);
+    
     let light = Light(
         vec3<f32>(0.0, 100.0, 0.0),
         vec3<f32>(1.0, 1.0, 1.0),

@@ -41,7 +41,7 @@ impl Plugin for ChunkRenderPipelinePlugin {
         render_app.add_systems(
             Render,
             (
-                queue_custom_render_pipeline.in_set(RenderSet::QueueMeshes),
+                queue_custom_render_pipeline.in_set(RenderSet::Queue),
                 //prepare_instance_buffers.in_set(RenderSet::PrepareResources),
             ),
         );
@@ -66,7 +66,7 @@ fn queue_custom_render_pipeline(
     pipeline_cache: Res<PipelineCache>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     views: Query<(&RenderVisibleEntities, &ExtractedView, &Msaa)>,
-    material_meshes: Query<(Entity, &MainEntity), With<RenderableChunk>>,
+    material_meshes: Query<(Entity, &MainEntity, &RenderableChunk)>,
 ) {
     // Get the id for our custom draw function
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
@@ -84,8 +84,8 @@ fn queue_custom_render_pipeline(
         let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
-        //let rangefinder = view.rangefinder3d();
-        for (render_entity, visible_entity) in &material_meshes // TODO: frustrum culling. see https://github.com/bevyengine/bevy/blob/19ee692f9621f89f305096f423507e925b748b9a/examples/shader/specialized_mesh_pipeline.rs#L353
+        let rangefinder = view.rangefinder3d();
+        for (render_entity, visible_entity, renderable_chunk) in &material_meshes // TODO: frustrum culling. see https://github.com/bevyengine/bevy/blob/19ee692f9621f89f305096f423507e925b748b9a/examples/shader/specialized_mesh_pipeline.rs#L353
         {
             // Specialize the key for the current mesh entity
             // For this example we only specialize based on the mesh topology
@@ -101,7 +101,7 @@ fn queue_custom_render_pipeline(
                 entity: (render_entity, *visible_entity),
                 pipeline,
                 draw_function: draw_custom,
-                distance: 2.0,//rangefinder.distance_translation(&mesh_instance.translation),
+                distance: rangefinder.distance_translation(&renderable_chunk.chunk_position().map(|x| x * 32).as_vec3()),
                 batch_range: 0..1,
                 extra_index: PhaseItemExtraIndex::None,
                 indexed: true,
@@ -148,7 +148,7 @@ impl SpecializedRenderPipeline for CustomPipeline {
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
         // Define a buffer layout for our vertex buffer. Our vertex buffer only has one entry which is a packed u32
         let vertex_buffer_layout = VertexBufferLayout {
-            array_stride: 0,
+            array_stride: std::mem::size_of::<[f32; 3]>() as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: vec![
                 VertexAttribute {
@@ -160,17 +160,17 @@ impl SpecializedRenderPipeline for CustomPipeline {
         };
 
         let instance_buffer_layout = VertexBufferLayout {
-            array_stride: 0,
+            array_stride: std::mem::size_of::<u32>() as u64,
             step_mode: VertexStepMode::Instance,
             attributes: vec![
                 VertexAttribute {
                     format: VertexFormat::Uint32,
-                    offset: std::mem::size_of::<[f32; 3]>() as u64,
+                    offset: 0,
                     shader_location: 1,
                 }
             ],
         };
-
+        
         RenderPipelineDescriptor {
             label: Some("Specialized Mesh Pipeline".into()),
             layout: vec![
@@ -187,7 +187,7 @@ impl SpecializedRenderPipeline for CustomPipeline {
                 shader_defs: vec![],
                 entry_point: "vertex".into(),
                 // Customize how to store the meshes' vertex attributes in the vertex buffer
-                buffers: vec![instance_buffer_layout, vertex_buffer_layout],
+                buffers: vec![vertex_buffer_layout, instance_buffer_layout],
             },
             fragment: Some(FragmentState {
                 shader: self.shader_handle.clone(),
@@ -208,9 +208,10 @@ impl SpecializedRenderPipeline for CustomPipeline {
                 })],
             }),
             primitive: PrimitiveState {
-                topology: key.primitive_topology(),
-                front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
+                topology: PrimitiveTopology::TriangleList,
+                front_face: bevy::render::render_resource::FrontFace::Ccw,
+                cull_mode: Some(Face::Front),
+                unclipped_depth: false,
                 polygon_mode: PolygonMode::Fill,
                 conservative: false, // Enabling this requires `Features::CONSERVATIVE_RASTERIZATION` to be enabled.
                 ..default()
@@ -253,7 +254,6 @@ impl<P: PhaseItem> RenderCommand<P> for DrawChunk {
         let Some(renderable_chunk) = renderable_chunk else {
             return RenderCommandResult::Skip;
         };
-
         renderable_chunk.render(render_device, pass);
         RenderCommandResult::Success
     }

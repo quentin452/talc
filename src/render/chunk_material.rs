@@ -77,7 +77,7 @@ impl PackedQuad {
             | (ao << 18u32)
             | (x_strech << 20u32)
             | (y_strech << 25u32);
-
+        
         Self { packed_u32 }
     }
 }
@@ -108,6 +108,10 @@ impl RenderableChunk {
     ) {
         self.0.render(render_device, render_pass)
     }
+
+    pub fn chunk_position(&self) -> ChunkPosition {
+        self.0.chunk_position
+    }
 }
 
 struct BakedChunkMaterial {
@@ -129,13 +133,14 @@ impl ChunkMaterial {
         self.baked.get_or_init(|| {
             let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
                 label: Some("chunk per-instance data buffer"),
-                contents: bytemuck::cast_slice(self.quads.as_slice()),
+                contents: bytemuck::cast_slice(&self.quads),
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             });
+            
             let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
                 label: Some("chunk uniform buffer"),
                 contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
-                usage: BufferUsages::UNIFORM,
+                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             });
             
             let uniform_bind_group = render_device.create_bind_group(
@@ -168,6 +173,7 @@ impl ChunkMaterial {
             uniform_bind_group,
             simple_quad: simple_quad_index_buffer,
         } = self.bake(render_device);
+        let instance_buffer_length = *instance_buffer_length as u32;
 
         render_pass.set_index_buffer(
             simple_quad_index_buffer.index_buffer.slice(..),
@@ -177,10 +183,11 @@ impl ChunkMaterial {
         render_pass.set_vertex_buffer(0, simple_quad_index_buffer.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
         render_pass.set_bind_group(1, &uniform_bind_group, &[]);
+        
         render_pass.draw_indexed(
             0..simple_quad_index_buffer.length,
             0,
-            0..*instance_buffer_length as u32,
+            0..instance_buffer_length,
         );
     }
 }

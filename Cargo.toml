@@ -19,7 +19,7 @@ futures-lite = "2.6"
 mlua = {version = "0.10.3", features = ["luau-jit", "anyhow"]}
 serde = "1.0.218"
 toml = "0.8"
-bevy = {git = "https://github.com/bevyengine/bevy", rev = "06cb5c5"}
+bevy = {git = "https://github.com/bevyengine/bevy", rev = "06cb5c5", features = ["dynamic_linking"]}
 rand = "0.9.0"
 bytemuck = "1.22.0"
 

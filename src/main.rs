@@ -11,6 +11,7 @@ use bevy::{
     },
 };
 
+use talc::debug_menu::FpsCounterPlugin;
 use talc::mod_manager::mod_loader::ModLoaderPlugin;
 use talc::player::{
     debug_camera::{FlyCam, NoCameraPlayerPlugin},
@@ -52,6 +53,7 @@ fn main() {
         .add_plugins(NoCameraPlayerPlugin)
         .add_systems(Update, smooth_transform)
         .add_plugins(ChunkRenderPipelinePlugin)
+        .add_plugins(FpsCounterPlugin)
         .run();
 }
 

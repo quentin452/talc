@@ -9,3 +9,4 @@ pub mod render;
 pub mod smooth_transform;
 pub mod sun;
 pub mod utils;
+pub mod debug_menu;

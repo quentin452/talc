@@ -69,7 +69,7 @@ impl PackedQuad {
             debug_assert!(x_strech < 32, "x strech out of range. expected 0..=31, got {x_strech}");
             debug_assert!(y_strech < 32, "y strech out of range. expected 0..=31, got {y_strech}");
         }
-
+        
         let packed_u32: u32 = x as u32
             | ((y as u32) << 5u32)
             | ((z as u32) << 10u32)

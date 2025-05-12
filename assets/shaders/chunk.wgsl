@@ -46,8 +46,8 @@ fn x_positive_bits(bits: u32) -> u32 {
 
 @vertex
 fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
-    let x_strech = vertex.vert_data >> 20u & x_positive_bits(5u);
-    let y_strech = vertex.vert_data >> 25u & x_positive_bits(5u);
+    let x_strech = (vertex.vert_data >> 20u & x_positive_bits(5u)) + 1;
+    let y_strech = (vertex.vert_data >> 25u & x_positive_bits(5u)) + 1;
     var x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32);
     var y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32);
     var z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32);
@@ -55,9 +55,9 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
 
     switch normal_index {
         case 0u: { // left
-            y -= instance_input.constant_quad.z * f32(x_strech);
+            y += instance_input.constant_quad.x * f32(x_strech) - 1;
             x += 0.0;
-            z += instance_input.constant_quad.x * f32(y_strech);
+            z += instance_input.constant_quad.z * f32(y_strech);
         }
         case 1u: { // right
             y += instance_input.constant_quad.z * f32(x_strech) - 1;
@@ -65,9 +65,9 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
             z += instance_input.constant_quad.x * f32(y_strech);
         }
         case 2u: { // down
-            x += instance_input.constant_quad.x * f32(y_strech);
-            y += 0.0;
-            z -= instance_input.constant_quad.z * f32(x_strech);
+            x += instance_input.constant_quad.z * f32(y_strech);
+            y += -1.0;
+            z += instance_input.constant_quad.x * f32(x_strech);
         }
         case 3u, default: { // up
             x += instance_input.constant_quad.x * f32(y_strech);
@@ -80,9 +80,9 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
             y += instance_input.constant_quad.z * f32(x_strech) - 1;
         }
         case 5u { // backward
-            x += instance_input.constant_quad.x * f32(y_strech);
+            x += instance_input.constant_quad.z * f32(y_strech);
             z += 1.0;
-            y -= instance_input.constant_quad.z * f32(x_strech);
+            y += instance_input.constant_quad.x * f32(x_strech) - 1;
         }
     }
     let ao = vertex.vert_data >> 18u & x_positive_bits(2u);
@@ -90,6 +90,7 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
     out.normal = normals[normal_index];
     out.ambient = ao;
+    //out.position = vec3<f32>(x,y,z);
     out.clip_position = position_world_to_clip(vec3<f32>(x,y,z));
 
     return out;
@@ -110,7 +111,7 @@ struct Light {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+    let object_color: vec4<f32> = vec4<f32>(in.normal, 1.0);
     
     let light = Light(
         vec3<f32>(0.0, 100.0, 0.0),

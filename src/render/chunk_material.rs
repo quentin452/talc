@@ -56,8 +56,8 @@ impl PackedQuad {
         let z = position.z;
 
         let ao = 0; // todo
-        let x_strech = x_strech.min(31);
-        let y_strech = y_strech.min(31);
+        let x_strech = x_strech - 1;
+        let y_strech = y_strech - 1;
 
         #[rustfmt::skip]
         {

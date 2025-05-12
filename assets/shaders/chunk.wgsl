@@ -51,17 +51,16 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
     var x = f32(vertex.vert_data & x_positive_bits(5u)) + f32(chunk_position.x * 32);
     var y = f32(vertex.vert_data >> 5u & x_positive_bits(5u)) + f32(chunk_position.y * 32);
     var z = f32(vertex.vert_data >> 10u & x_positive_bits(5u)) + f32(chunk_position.z * 32);
+    
     let normal_index = vertex.vert_data >> 15u & x_positive_bits(3u);
-
     switch normal_index {
         case 0u: { // left
             y += instance_input.constant_quad.x * f32(x_strech) - 1;
-            x += 0.0;
             z += instance_input.constant_quad.z * f32(y_strech);
         }
         case 1u: { // right
-            y += instance_input.constant_quad.z * f32(x_strech) - 1;
             x += 1.0;
+            y += instance_input.constant_quad.z * f32(x_strech) - 1;
             z += instance_input.constant_quad.x * f32(y_strech);
         }
         case 2u: { // down
@@ -71,18 +70,16 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
         }
         case 3u, default: { // up
             x += instance_input.constant_quad.x * f32(y_strech);
-            y += 0.0;
             z += instance_input.constant_quad.z * f32(x_strech);
         }
         case 4u { // forward
             x += instance_input.constant_quad.x * f32(y_strech);
-            z += 0.0;
             y += instance_input.constant_quad.z * f32(x_strech) - 1;
         }
         case 5u { // backward
             x += instance_input.constant_quad.z * f32(y_strech);
-            z += 1.0;
             y += instance_input.constant_quad.x * f32(x_strech) - 1;
+            z += 1.0;
         }
     }
     let ao = vertex.vert_data >> 18u & x_positive_bits(2u);
@@ -90,7 +87,7 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
     out.normal = normals[normal_index];
     out.ambient = ao;
-    //out.position = vec3<f32>(x,y,z);
+    out.position = vec3<f32>(x,y,z);
     out.clip_position = position_world_to_clip(vec3<f32>(x,y,z));
 
     return out;

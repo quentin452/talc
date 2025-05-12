@@ -11,7 +11,7 @@ use bevy::{
             RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
         }, render_resource::{
             BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
-            Face, FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode,
+            Face, FragmentState, MultisampleState, PipelineCache, PolygonMode,
             PrimitiveState, RenderPipelineDescriptor, SpecializedRenderPipeline,
             SpecializedRenderPipelines, TextureFormat, VertexAttribute, VertexFormat, VertexState,
             VertexStepMode,

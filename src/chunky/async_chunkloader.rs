@@ -268,12 +268,13 @@ fn unload_meshes(
     let to_unload: Vec<ChunkPosition> = chunkloader.get_chunks_to_unmesh().collect();
     for chunk_position in to_unload {
         chunk_entities.0.remove(&chunk_position);
+        chunkloader.worldgen_tasks.remove(&chunk_position);
 
         // todo: refactor to use bevy indexes when the update drops.
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
                 if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
-                    entity_commands.remove::<Mesh3d>();
+                    entity_commands.despawn();
                     break;
                 }
             }

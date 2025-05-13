@@ -11,7 +11,8 @@ use bevy::{platform_support::collections::HashSet, prelude::*};
 
 use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;
-use crate::{position::ChunkPosition, utils::index_to_ivec3_bounds};
+use crate::render::chunk_material::RenderableChunk;
+use crate::{position::ChunkPosition};
 
 use crate::chunky::{async_chunkloader::AsyncChunkloader, chunk::CHUNK_SIZE_I32};
 
@@ -57,9 +58,9 @@ pub struct Scanner {
 
 impl Scanner {
     /// construct scanner, chunk offsets are based on distance
-    /// warning: slow execution time on distances above 15-20,
+    /// warning: slow execution time on distances above 30-40,
     #[must_use]
-    pub fn new(distance: i32) -> Self {
+    pub fn new(distance: u32) -> Self {
         let mesh_distance = distance;
         // This is +1 becuase meshes require all adjacent chunks loaded in a 3x3x3 area before they can be meshed.
         let worldgen_distance = distance + 1;
@@ -80,6 +81,8 @@ impl Scanner {
 fn detect_move(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut chunkloader: ResMut<AsyncChunkloader>,
+    chunk_entities: Res<Chunks>,
+    renderable: Query<&RenderableChunk>
 ) {
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
@@ -91,6 +94,8 @@ fn detect_move(
         if !chunk_pos_changed {
             return;
         }
+        println!("loaded {} {}", chunk_entities.0.len(), renderable.iter().len());        
+
         let load_data_area = scanner
             .worldgen_sampling_offsets
             .iter()
@@ -177,19 +182,26 @@ fn detect_move(
     }
 }
 
-/// constructs spherical chunk positions with the provided chunk radius
-fn make_offset_vec(half: i32) -> Vec<ChunkPosition> {
-    let k = (half * 2) + 1;
+/// constructs a cylinder of chunk positions with the provided chunk radius
+fn make_offset_vec(diameter: u32) -> Vec<ChunkPosition> {
     let mut sampling_offsets = vec![];
-    for i in 0..k * k * k {
-        let mut pos = index_to_ivec3_bounds(i, k);
-        pos -= IVec3::splat((k as f32 * 0.5) as i32);
-        sampling_offsets.push(ChunkPosition(pos));
+    let diameter = diameter as i32;
+    let radius = diameter / 2;
+    for x in -radius..radius {
+        for z in -radius..radius {
+            if IVec2::new(x, z).distance_squared(IVec2::ZERO) <= radius * radius {
+                for y in -radius..radius {
+                    sampling_offsets.push(ChunkPosition::new(x, y, z));
+                }
+            }
+        }
     }
+    
     sampling_offsets.sort_by(|a, b| {
-        a.0.distance_squared(IVec3::ZERO)
-            .cmp(&b.0.distance_squared(IVec3::ZERO))
+        a.distance_squared(IVec3::ZERO)
+            .cmp(&b.distance_squared(IVec3::ZERO))
     });
+
     sampling_offsets
 }
 

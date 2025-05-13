@@ -108,7 +108,7 @@ struct Light {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4<f32> = vec4<f32>(in.normal, 1.0);
+    let object_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
     
     let light = Light(
         vec3<f32>(0.0, 100.0, 0.0),

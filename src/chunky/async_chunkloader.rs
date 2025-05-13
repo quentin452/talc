@@ -113,11 +113,17 @@ fn spawn_chunk_as_bevy_entity(
     chunk_entities: &mut Chunks,
     timer: &Time,
     commands: &mut Commands,
+    chunk_canididates: Query<(Entity, &Chunk)>,
 ) {
     let chunk_position = chunk_data.position;
-    /*if let Some(entity) = chunk_entities.0.get(&chunk_position) {
-        commands.entity(*entity).despawn();
-    }*/
+    for (entity_id, chunk) in chunk_canididates.iter() {
+        if chunk.position == chunk_position {
+            if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
+                entity_commands.despawn();
+                break;
+            }
+        }
+    }
 
     commands.spawn((
         Chunk {
@@ -165,6 +171,7 @@ fn join_worldgen_threads(
     mut chunk_entities: ResMut<Chunks>,
     timer: Res<Time>,
     mut commands: Commands,
+    chunk_canididates: Query<(Entity, &Chunk)>,
 ) {
     chunkloader.worldgen_tasks.retain(|_, task| {
         // check on our worldgen task to see how it's doing :)
@@ -175,7 +182,7 @@ fn join_worldgen_threads(
 
         // if this task is done, handle the data it returned!
         if let Some(chunk_component) = status {
-            spawn_chunk_as_bevy_entity(chunk_component, &mut chunk_entities, &timer, &mut commands);
+            spawn_chunk_as_bevy_entity(chunk_component, &mut chunk_entities, &timer, &mut commands, chunk_canididates);
         }
 
         retain
@@ -246,6 +253,8 @@ fn unload_chunks(
     let to_unload: Vec<ChunkPosition> = chunkloader.get_chunks_to_unload().collect();
     for chunk_position in to_unload {
         chunk_entities.0.remove(&chunk_position);
+        chunkloader.worldgen_tasks.remove(&chunk_position);
+        
         // todo: refactor to use bevy indexes when the update drops.
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
@@ -261,20 +270,16 @@ fn unload_chunks(
 #[allow(clippy::needless_pass_by_value)]
 fn unload_meshes(
     mut chunkloader: ResMut<AsyncChunkloader>,
-    mut chunk_entities: ResMut<Chunks>,
     mut commands: Commands,
     chunk_canididates: Query<(Entity, &Chunk)>,
 ) {
     let to_unload: Vec<ChunkPosition> = chunkloader.get_chunks_to_unmesh().collect();
     for chunk_position in to_unload {
-        chunk_entities.0.remove(&chunk_position);
-        chunkloader.worldgen_tasks.remove(&chunk_position);
-
         // todo: refactor to use bevy indexes when the update drops.
         for (entity_id, chunk) in chunk_canididates.iter() {
             if chunk.position == chunk_position {
                 if let Ok(mut entity_commands) = commands.get_entity(entity_id) {
-                    entity_commands.despawn();
+                    entity_commands.remove::<RenderableChunk>();
                     break;
                 }
             }

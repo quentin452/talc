@@ -86,7 +86,7 @@ fn update(
 
         for entity in query.iter_mut() {
             if let Some((fps, frame_time)) = fps_dialog {
-                *writer.text(entity, 0) = format!("{}{:.0}\n{:.2} ms", STRING_FORMAT, fps, frame_time);
+                *writer.text(entity, 0) = format!("{}{:.0}\n{:.1} ms", STRING_FORMAT, fps, frame_time);
             } else {
                 *writer.text(entity, 0) = STRING_MISSING.to_string();
             }

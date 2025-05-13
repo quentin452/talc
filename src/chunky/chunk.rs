@@ -209,7 +209,7 @@ impl ChunkData {
             fast_noise.set_frequency(0.0254);
             let overhang = fast_noise.get_noise3d(wx * scale, wy, wz * scale) * 55.0;
             fast_noise.set_frequency(0.002591);
-            let noise_2 = fast_noise.get_noise(wx + overhang, wz * scale);
+            let noise_2 = fast_noise.get_noise(wx + overhang, wz / 3.0);
             let h = noise_2 * 30.0;
             let solid = h > wy;
 

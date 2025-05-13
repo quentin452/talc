@@ -7,6 +7,8 @@ use bevy::{
 
     use std::time::Duration;
 
+    use crate::{chunky::{async_chunkloader::Chunks, chunk::Chunk}, render::chunk_material::RenderableChunk};
+
 pub const FONT_SIZE: f32 = 32.;
 pub const FONT_COLOR: Color = Color::WHITE;
 pub const STRING_FORMAT: &str = "FPS: ";
@@ -70,6 +72,8 @@ fn update(
     state_resources: Option<ResMut<FpsCounter>>,
     mut query: Query<Entity, With<FpsCounterText>>,
     mut writer: TextUiWriter,
+    chunk_entities: Res<Chunks>,
+    renderable_chunks: Query<(&Chunk, &RenderableChunk)>
 ) {
     let Some(mut state) = state_resources else {
         return;
@@ -86,7 +90,7 @@ fn update(
 
         for entity in query.iter_mut() {
             if let Some((fps, frame_time)) = fps_dialog {
-                *writer.text(entity, 0) = format!("{}{:.0}\n{:.1} ms", STRING_FORMAT, fps, frame_time);
+                *writer.text(entity, 0) = format!("{}{:.0}\n{:.1} ms\nloaded chunks: {}\nmeshed chunks: {}", STRING_FORMAT, fps, frame_time, chunk_entities.0.len(), renderable_chunks.iter().len());
             } else {
                 *writer.text(entity, 0) = STRING_MISSING.to_string();
             }

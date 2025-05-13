@@ -82,8 +82,6 @@ impl Scanner {
 fn detect_move(
     mut scanners: Query<(&mut Scanner, &GlobalTransform)>,
     mut chunkloader: ResMut<AsyncChunkloader>,
-    chunk_entities: Res<Chunks>,
-    renderable: Query<&RenderableChunk>
 ) {
     for (mut scanner, g_transform) in &mut scanners {
         let chunk_pos = (g_transform.translation().as_ivec3() - IVec3::splat(CHUNK_SIZE_I32 / 2))
@@ -95,7 +93,6 @@ fn detect_move(
         if !chunk_pos_changed {
             return;
         }
-        println!("loaded {} {}", chunk_entities.0.len(), renderable.iter().len());        
 
         let load_data_area = scanner
             .worldgen_sampling_offsets

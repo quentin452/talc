@@ -32,7 +32,7 @@ pub fn smooth_transform(
         let delta_seconds = if timer.elapsed() < smooth_transform.end_timestamp {
             timer.delta_secs()
         } else {
-            commands.entity(entity).remove::<SmoothTransformTo>();
+            commands.entity(entity).try_remove::<SmoothTransformTo>();
             let time_of_previous_update = timer.elapsed() - timer.delta();
             if time_of_previous_update >= smooth_transform.end_timestamp {
                 return;

@@ -82,11 +82,11 @@ fn update(
             writer.text(entity, 0).clear();
         }
     } else {
-        let fps_dialog: Option<f64> = extract_fps(&diagnostics);
+        let fps_dialog = extract_fps(&diagnostics);
 
         for entity in query.iter_mut() {
-            if let Some(fps) = fps_dialog {
-                *writer.text(entity, 0) = format!("{}{:.0}", STRING_FORMAT, fps);
+            if let Some((fps, frame_time)) = fps_dialog {
+                *writer.text(entity, 0) = format!("{}{:.0}\n{:.2} ms", STRING_FORMAT, fps, frame_time);
             } else {
                 *writer.text(entity, 0) = STRING_MISSING.to_string();
             }
@@ -94,10 +94,18 @@ fn update(
     }
 }
 
-fn extract_fps(diagnostics: &Res<DiagnosticsStore>) -> Option<f64> {
-    diagnostics
+fn extract_fps(diagnostics: &Res<DiagnosticsStore>) -> Option<(f64, f64)> {
+    if let Some(fps) = diagnostics
         .get(&FrameTimeDiagnosticsPlugin::FPS)
-        .and_then(|fps| fps.average())
+        .and_then(|fps| fps.average()) {
+        if let Some(frame_time) = diagnostics
+            .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
+            .and_then(|frame_time| frame_time.average()) {
+            return Some((fps, frame_time));
+        }
+    }
+
+    None    
 }
 
 fn spawn_text(mut commands: Commands) {

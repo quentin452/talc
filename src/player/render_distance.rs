@@ -7,7 +7,8 @@ but anything above that might induce some frame lag, due to how the load/unload 
 
 use std::collections::VecDeque;
 
-use bevy::{platform_support::collections::HashSet, prelude::*};
+use bevy::platform::collections::HashSet;
+use bevy::prelude::*;
 
 use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;

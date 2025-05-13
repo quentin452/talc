@@ -15,7 +15,7 @@ use bevy::{
             PrimitiveState, RenderPipelineDescriptor, SpecializedRenderPipeline,
             SpecializedRenderPipelines, TextureFormat, VertexAttribute, VertexFormat, VertexState,
             VertexStepMode,
-        }, renderer::RenderDevice, sync_world::MainEntity, view::{ExtractedView, RenderVisibleEntities, ViewTarget}, Render, RenderApp, RenderSet
+        }, renderer::RenderDevice, sync_world::MainEntity, view::{ExtractedView, RenderVisibleEntities, ViewTarget}, Render, RenderApp, RenderSystems
     },
 };
 
@@ -41,8 +41,8 @@ impl Plugin for ChunkRenderPipelinePlugin {
         render_app.add_systems(
             Render,
             (
-                queue_custom_render_pipeline.in_set(RenderSet::Queue),
-                //prepare_instance_buffers.in_set(RenderSet::PrepareResources),
+                queue_custom_render_pipeline.in_set(RenderSystems::Queue),
+                //prepare_instance_buffers.in_set(RenderSystems::PrepareResources),
             ),
         );
     }

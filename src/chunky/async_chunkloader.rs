@@ -1,7 +1,7 @@
 use std::{sync::Arc, vec::Drain};
 
 use bevy::{
-    platform_support::collections::HashMap,
+    platform::collections::HashMap,
     prelude::*,
     render::primitives::Aabb,
     tasks::{AsyncComputeTaskPool, Task, block_on},

@@ -3,6 +3,7 @@
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
+    window::{PresentMode, Window, PrimaryWindow},
 };
 
     use std::time::Duration;
@@ -24,7 +25,25 @@ impl Plugin for FpsCounterPlugin {
         app.add_plugins(FrameTimeDiagnosticsPlugin::default())
             .add_systems(Startup, spawn_text)
             .add_systems(Update, update)
+            .add_systems(Update, vsync_toggle_keybind)
             .init_resource::<FpsCounter>();
+    }
+}
+
+fn vsync_toggle_keybind(
+    mut primary_window: Query<&mut Window, With<PrimaryWindow>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+) {
+    let Ok(mut window) = primary_window.single_mut() else {
+        return;
+    };
+
+    if keyboard_input.just_pressed(KeyCode::KeyV) {
+        window.present_mode = if window.present_mode == PresentMode::AutoVsync {
+            PresentMode::AutoNoVsync
+        } else {
+            PresentMode::AutoVsync
+        };
     }
 }
 

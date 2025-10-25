@@ -25,6 +25,13 @@ use talc::{chunky::async_chunkloader::AsyncChunkloaderPlugin, sun::SunPlugin};
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    present_mode: bevy::window::PresentMode::AutoVsync,
+                    ..default()
+                }),
+                ..default()
+            })
             .set(RenderPlugin {
                 render_creation: RenderCreation::Automatic(WgpuSettings {
                     // WARN this is a native only feature. It will not work with webgl or webgpu

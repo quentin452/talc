@@ -56,7 +56,7 @@ pub struct FlyCam;
 /// Grabs/ungrabs mouse cursor
 fn toggle_grab_cursor(window: &mut Window) {
     if window.cursor_options.grab_mode == CursorGrabMode::None {
-        window.cursor_options.grab_mode = CursorGrabMode::Confined;
+        window.cursor_options.grab_mode = CursorGrabMode::Locked;        
         window.cursor_options.visible = false;
     } else {
         window.cursor_options.grab_mode = CursorGrabMode::None;

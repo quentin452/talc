@@ -24,7 +24,7 @@ struct InstanceInput {
 
 struct VertexInput {
     @location(1) vert_data: u32,
-    //@builtin(vertex_index) vertex_index: u32
+    @location(2) color: u32,
 };
 
 var<private> ambient_lerps: vec4<f32> = vec4<f32>(1.0,0.7,0.5,0.15);
@@ -89,6 +89,12 @@ fn vertex(vertex: VertexInput, instance_input: InstanceInput) -> VertexOutput {
     out.ambient = ao;
     out.position = vec3<f32>(x,y,z);
     out.clip_position = position_world_to_clip(vec3<f32>(x,y,z));
+    out.color = vec4<f32>(
+        f32((vertex.color >> 24u) & 0xFFu) / 255.0,
+        f32((vertex.color >> 16u) & 0xFFu) / 255.0,
+        f32((vertex.color >> 8u) & 0xFFu) / 255.0,
+        f32(vertex.color & 0xFFu) / 255.0
+    );
 
     return out;
 }
@@ -97,7 +103,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) position: vec3<f32>,
-    @location(2) blend_color: vec3<f32>,
+    @location(2) color: vec4<f32>,
     @location(3) ambient: u32,
 };
 
@@ -108,7 +114,7 @@ struct Light {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+    let object_color: vec4<f32> = in.color;
     
     let light = Light(
         vec3<f32>(0.0, 100.0, 0.0),

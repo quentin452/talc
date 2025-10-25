@@ -39,6 +39,8 @@ pub struct PackedQuad {
     /// y strech: 00000 (30)
     /// 2 bits are free :)
     packed_u32: u32,
+    /// The color of the quad.
+    color: u32,
 }
 
 impl PackedQuad {
@@ -50,6 +52,7 @@ impl PackedQuad {
         _ao: u32,
         x_strech: u32,
         y_strech: u32,
+        color: u32,
     ) -> PackedQuad {
         let x = position.x;
         let y = position.y;
@@ -78,7 +81,7 @@ impl PackedQuad {
             | (x_strech << 20u32)
             | (y_strech << 25u32);
         
-        Self { packed_u32 }
+        Self { packed_u32, color }
     }
 }
 

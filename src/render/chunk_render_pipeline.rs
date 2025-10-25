@@ -19,7 +19,7 @@ use bevy::{
     },
 };
 
-use super::chunk_material::{RenderableChunk, bind_group_layout};
+use super::chunk_material::{RenderableChunk, bind_group_layout, PackedQuad};
 
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
@@ -160,14 +160,19 @@ impl SpecializedRenderPipeline for CustomPipeline {
         };
 
         let instance_buffer_layout = VertexBufferLayout {
-            array_stride: std::mem::size_of::<u32>() as u64,
+            array_stride: std::mem::size_of::<PackedQuad>() as u64,
             step_mode: VertexStepMode::Instance,
             attributes: vec![
                 VertexAttribute {
                     format: VertexFormat::Uint32,
                     offset: 0,
                     shader_location: 1,
-                }
+                },
+                VertexAttribute {
+                    format: VertexFormat::Uint32,
+                    offset: std::mem::size_of::<u32>() as u64,
+                    shader_location: 2,
+                },
             ],
         };
         

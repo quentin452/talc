@@ -4,6 +4,7 @@ use crate::{
     mod_manager::prototypes::BlockPrototype,
     position::Position,
     render::chunk_material::{PackedQuad, RenderableChunk},
+    chunky::chunk::access_block_registry,
 };
 
 use super::{
@@ -212,6 +213,15 @@ pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Re
         };
         for (block_ao, axis_plane) in block_ao_data {
             let ao = block_ao & 0b111111111;
+            let block_id = (block_ao >> 9) as u16;
+            let block_prototype = access_block_registry(block_id).expect("Invalid block id in greedy mesher.");
+            let srgba = block_prototype.color.to_srgba();
+            let r = (srgba.red * 255.0) as u32;
+            let g = (srgba.green * 255.0) as u32;
+            let b = (srgba.blue * 255.0) as u32;
+            let a = (srgba.alpha * 255.0) as u32;
+            let color = (r << 24) | (g << 16) | (b << 8) | a;
+
             for (axis_pos, plane) in axis_plane {
                 for greedy_quad in greedy_mesh_binary_plane(plane, lod.size() as u32) {
                     let axis = axis_pos as i32;
@@ -226,6 +236,7 @@ pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Re
                         ao,
                         greedy_quad.h,
                         greedy_quad.w,
+                        color,
                     );
                     quads.push(packed_quad);
                 }

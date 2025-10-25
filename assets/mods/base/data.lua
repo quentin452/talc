@@ -13,7 +13,7 @@ extend {
     order = "a[blocks]-b[grass]",
     is_transparent = false,
     is_meshable = true,
-    color = {1, 1, 1}
+    color = {0.2, 0.8, 0.2}
 }
 
 extend {
@@ -22,5 +22,5 @@ extend {
     order = "a[blocks]-c[dirt]",
     is_transparent = false,
     is_meshable = true,
-    color = {1, 1, 1}
+    color = {0.5, 0.3, 0.1}
 }
